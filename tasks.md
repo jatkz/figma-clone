@@ -60,7 +60,7 @@
 - [x] Setup automatic deployments on push
 
 ### 1.5 TypeScript Types
-- [ ] Create `src/types/canvas.ts`:
+- [x] Create `src/types/canvas.ts`:
   ```typescript
   export interface CanvasObject {
     id: string;
@@ -99,8 +99,8 @@
   export const CANVAS_CENTER_X = 2500;
   export const CANVAS_CENTER_Y = 2500;
   ```
-- [ ] Create `.env.example` file with placeholder values (will commit this)
-- [ ] Create `.env` file with actual values (will NOT commit this)
+- [x] Create `.env.example` file with placeholder values (will commit this)
+- [x] Create `.env` file with actual values (will NOT commit this)
 
 ---
 
