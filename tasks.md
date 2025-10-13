@@ -43,9 +43,9 @@
 - [x] Setup Firestore security rules (from PRD Appendix)
 
 ### 1.3 Auth0 Setup
-- [ ] Create Auth0 account and application
-- [ ] Configure callback URLs (localhost + Vercel)
-- [ ] Add Auth0 environment variables:
+- [x] Create Auth0 account and application
+- [x] Configure callback URLs (localhost + Vercel)
+- [x] Add Auth0 environment variables:
   ```
   VITE_AUTH0_DOMAIN=
   VITE_AUTH0_CLIENT_ID=
@@ -54,10 +54,10 @@
 - [x] Create Auth0 config file `src/config/auth0.ts`
 
 ### 1.4 Vercel Setup
-- [ ] Create Vercel account
-- [ ] Connect GitHub repository
-- [ ] Configure environment variables in Vercel dashboard
-- [ ] Setup automatic deployments on push
+- [x] Create Vercel account
+- [x] Connect GitHub repository
+- [x] Configure environment variables in Vercel dashboard
+- [x] Setup automatic deployments on push
 
 ### 1.5 TypeScript Types
 - [ ] Create `src/types/canvas.ts`:
