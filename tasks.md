@@ -207,10 +207,10 @@
   ```
 
 ### 3.5 Object Selection (Local Only)
-- [ ] Track selected object ID in local state
-- [ ] Click on rectangle to select
-- [ ] Show selection box (stroke around selected object)
-- [ ] Click on empty canvas to deselect
+- [x] Track selected object ID in local state
+- [x] Click on rectangle to select
+- [x] Show selection box (stroke around selected object)
+- [x] Click on empty canvas to deselect
 
 ---
 
