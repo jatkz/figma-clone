@@ -115,18 +115,18 @@
 - [x] Setup protected route wrapper component
 
 ### 2.2 User Profile Management
-- [ ] Create `src/services/userService.ts`
-- [ ] Implement `createUserProfile(userId, email, displayName)`:
+- [x] Create `src/services/userService.ts`
+- [x] Implement `createUserProfile(userId, email, displayName)`:
   - Generate random cursor color from palette
   - Save to Firestore `/users/{userId}`
-- [ ] Implement `getUserProfile(userId)`
-- [ ] Create hook `src/hooks/useAuth.ts`:
+- [x] Implement `getUserProfile(userId)`
+- [x] Create hook `src/hooks/useAuth.ts`:
   - Get current user from Auth0
   - Load/create user profile from Firestore
   - Return user data and loading state
 
 ### 2.3 Color Palette
-- [ ] Create `src/utils/colors.ts`:
+- [x] Create `src/utils/colors.ts`:
   ```typescript
   export const CURSOR_COLORS = [
     '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A',
