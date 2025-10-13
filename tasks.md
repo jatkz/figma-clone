@@ -107,12 +107,12 @@
 ## Phase 2: Authentication (Hours 2-4)
 
 ### 2.1 Auth0 Integration
-- [ ] Wrap app with `Auth0Provider` in `main.tsx`
+- [x] Wrap app with `Auth0Provider` in `main.tsx`
   - Configure with email/password connection only (no social login for MVP)
-- [ ] Create `src/components/LoginButton.tsx`
-- [ ] Create `src/components/LogoutButton.tsx`
-- [ ] Create landing page with login (`src/pages/Landing.tsx`)
-- [ ] Setup protected route wrapper component
+- [x] Create `src/components/LoginButton.tsx`
+- [x] Create `src/components/LogoutButton.tsx`
+- [x] Create landing page with login (`src/pages/Landing.tsx`)
+- [x] Setup protected route wrapper component
 
 ### 2.2 User Profile Management
 - [ ] Create `src/services/userService.ts`
