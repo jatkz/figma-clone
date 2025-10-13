@@ -4,7 +4,10 @@ import {
   subscribeToObjects,
   createObject,
   updateObject,
-  deleteObject
+  deleteObject,
+  acquireLock,
+  releaseLock,
+  releaseExpiredLocks
 } from '../services/canvasService';
 import type { CanvasObject } from '../types/canvas';
 import type { CanvasObjectInput, CanvasObjectUpdate } from '../services/canvasService';
@@ -22,6 +25,8 @@ interface UseCanvasActions {
   updateObjectOptimistic: (objectId: string, updates: CanvasObjectUpdate) => Promise<CanvasObject | null>;
   deleteObjectOptimistic: (objectId: string) => Promise<boolean>;
   initializeCanvasIfNeeded: () => Promise<void>;
+  acquireObjectLock: (objectId: string) => Promise<boolean>;
+  releaseObjectLock: (objectId: string) => Promise<boolean>;
 }
 
 interface UseCanvasReturn extends UseCanvasState, UseCanvasActions {}
@@ -55,9 +60,9 @@ const throttle = <T extends (...args: any[]) => void>(func: T, delay: number): T
 
 /**
  * Custom hook for managing canvas state with real-time Firestore synchronization
- * Handles optimistic updates, error recovery, and throttled Firestore operations
+ * Handles optimistic updates, error recovery, throttled Firestore operations, and object locking
  */
-export const useCanvas = (): UseCanvasReturn => {
+export const useCanvas = (userId?: string): UseCanvasReturn => {
   // State management
   const [objects, setObjects] = useState<CanvasObject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -121,6 +126,30 @@ export const useCanvas = (): UseCanvasReturn => {
       }
     };
   }, []);
+
+  // Lock timeout checker - runs every 5 seconds
+  useEffect(() => {
+    if (!userId || !isConnected) return;
+
+    const checkExpiredLocks = async () => {
+      try {
+        await releaseExpiredLocks(userId);
+      } catch (error) {
+        console.error('Error checking expired locks:', error);
+      }
+    };
+
+    // Initial check after 5 seconds
+    const initialTimeout = window.setTimeout(checkExpiredLocks, 5000);
+    
+    // Then check every 5 seconds
+    const interval = window.setInterval(checkExpiredLocks, 5000);
+
+    return () => {
+      window.clearTimeout(initialTimeout);
+      window.clearInterval(interval);
+    };
+  }, [userId, isConnected]);
 
   // Throttled Firestore update function (500ms for production-grade efficiency)
   const throttledFirestoreUpdate = useCallback(
@@ -273,6 +302,47 @@ export const useCanvas = (): UseCanvasReturn => {
     }
   }, []);
 
+  // Acquire lock on an object
+  const acquireObjectLock = useCallback(async (objectId: string): Promise<boolean> => {
+    if (!userId) {
+      console.warn('Cannot acquire lock: user ID not provided');
+      return false;
+    }
+
+    try {
+      const success = await acquireLock(objectId, userId);
+      if (success) {
+        showToast('Object locked for editing', 'success');
+      } else {
+        showToast('Object is being edited by another user', 'error');
+      }
+      return success;
+    } catch (error) {
+      console.error('Failed to acquire lock:', error);
+      showToast('Failed to lock object', 'error');
+      return false;
+    }
+  }, [userId]);
+
+  // Release lock on an object
+  const releaseObjectLock = useCallback(async (objectId: string): Promise<boolean> => {
+    if (!userId) {
+      console.warn('Cannot release lock: user ID not provided');
+      return false;
+    }
+
+    try {
+      const success = await releaseLock(objectId, userId);
+      if (success) {
+        console.log(`🔓 Lock released on ${objectId}`);
+      }
+      return success;
+    } catch (error) {
+      console.error('Failed to release lock:', error);
+      return false;
+    }
+  }, [userId]);
+
   return {
     // State
     objects,
@@ -284,7 +354,9 @@ export const useCanvas = (): UseCanvasReturn => {
     createObjectOptimistic,
     updateObjectOptimistic,
     deleteObjectOptimistic,
-    initializeCanvasIfNeeded
+    initializeCanvasIfNeeded,
+    acquireObjectLock,
+    releaseObjectLock
   };
 };
 

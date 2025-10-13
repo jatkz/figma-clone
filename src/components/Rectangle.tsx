@@ -1,5 +1,5 @@
 import React from 'react';
-import { Rect } from 'react-konva';
+import { Rect, Text } from 'react-konva';
 import type { CanvasObject } from '../types/canvas';
 
 interface RectangleProps {
@@ -9,6 +9,8 @@ interface RectangleProps {
   onDragStart?: (objectId: string) => void;
   onDragMove?: (objectId: string, x: number, y: number) => void;
   onDragEnd?: (objectId: string, x: number, y: number) => void;
+  currentUserId?: string;
+  users?: { [userId: string]: { displayName: string; cursorColor: string } };
 }
 
 const Rectangle: React.FC<RectangleProps> = ({
@@ -18,6 +20,8 @@ const Rectangle: React.FC<RectangleProps> = ({
   onDragStart,
   onDragMove,
   onDragEnd,
+  currentUserId,
+  users = {},
 }) => {
   const handleClick = () => {
     onClick?.(object.id);
@@ -37,6 +41,18 @@ const Rectangle: React.FC<RectangleProps> = ({
     onDragEnd?.(object.id, x, y);
   };
 
+  // Determine lock status and colors
+  const isLockedByCurrentUser = object.lockedBy === currentUserId;
+  const isLockedByOther = object.lockedBy && !isLockedByCurrentUser;
+  const lockingUser = object.lockedBy ? users[object.lockedBy] : null;
+  
+  // Get lock border color
+  const getLockBorderColor = () => {
+    if (isLockedByCurrentUser) return '#007AFF'; // Blue for current user
+    if (isLockedByOther && lockingUser) return lockingUser.cursorColor || '#FF3B30'; // User's cursor color or red fallback
+    return '#FF3B30'; // Default red for unknown users
+  };
+
   return (
     <>
       {/* Main rectangle */}
@@ -48,7 +64,7 @@ const Rectangle: React.FC<RectangleProps> = ({
         height={object.height}
         fill={object.color}
         rotation={object.rotation}
-        draggable={true}
+        draggable={isLockedByCurrentUser} // Only allow dragging if current user has acquired the lock
         onClick={handleClick}
         onTap={handleClick} // For touch devices
         onDragStart={handleDragStart}
@@ -58,7 +74,7 @@ const Rectangle: React.FC<RectangleProps> = ({
         onMouseEnter={(e) => {
           const stage = e.target.getStage();
           if (stage) {
-            stage.container().style.cursor = 'pointer';
+            stage.container().style.cursor = isLockedByOther ? 'not-allowed' : 'pointer';
           }
         }}
         onMouseLeave={(e) => {
@@ -67,10 +83,12 @@ const Rectangle: React.FC<RectangleProps> = ({
             stage.container().style.cursor = 'default';
           }
         }}
+        // Visual feedback for locked objects
+        opacity={isLockedByOther ? 0.7 : 1.0}
       />
 
-      {/* Selection border */}
-      {isSelected && (
+      {/* Selection border (only show if selected and current user has lock) */}
+      {isSelected && isLockedByCurrentUser && (
         <Rect
           x={object.x - 2}
           y={object.y - 2}
@@ -85,19 +103,48 @@ const Rectangle: React.FC<RectangleProps> = ({
         />
       )}
 
-      {/* Lock indicator */}
+      {/* Lock indicator border */}
       {object.lockedBy && (
         <Rect
-          x={object.x - 1}
-          y={object.y - 1}
-          width={object.width + 2}
-          height={object.height + 2}
+          x={object.x - 3}
+          y={object.y - 3}
+          width={object.width + 6}
+          height={object.height + 6}
           fill="transparent"
-          stroke={object.lockedBy === 'current-user' ? '#007AFF' : '#FF3B30'} // Blue for current user, red for others
-          strokeWidth={2}
+          stroke={getLockBorderColor()}
+          strokeWidth={3}
           rotation={object.rotation}
+          dash={isLockedByCurrentUser ? [8, 4] : [4, 4]} // Different dash pattern for own vs others
           listening={false}
         />
+      )}
+
+      {/* User label for locked objects */}
+      {object.lockedBy && lockingUser && (
+        <React.Fragment>
+          {/* Background for username label */}
+          <Rect
+            x={object.x}
+            y={object.y - 25}
+            width={lockingUser.displayName.length * 8 + 12} // Approximate text width
+            height={20}
+            fill={getLockBorderColor()}
+            cornerRadius={4}
+            listening={false}
+          />
+          
+          {/* Username label */}
+          <Text
+            x={object.x + 6}
+            y={object.y - 20}
+            text={isLockedByCurrentUser ? 'You' : lockingUser.displayName}
+            fontSize={12}
+            fontFamily="Arial, sans-serif"
+            fill="white"
+            fontStyle="bold"
+            listening={false}
+          />
+        </React.Fragment>
       )}
     </>
   );

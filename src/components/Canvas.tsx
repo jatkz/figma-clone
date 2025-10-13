@@ -36,8 +36,10 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
     isConnected,
     createObjectOptimistic,
     updateObjectOptimistic,
-    deleteObjectOptimistic 
-  } = useCanvas();
+    deleteObjectOptimistic,
+    acquireObjectLock,
+    releaseObjectLock
+  } = useCanvas(user?.id);
 
   // Viewport state: centered at canvas center initially
   const [viewport, setViewport] = useState<ViewportState>({
@@ -76,6 +78,8 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
               // Delete selected rectangle with Firestore sync
               const success = await deleteObjectOptimistic(selectedObjectId);
               if (success) {
+                // Release lock automatically on successful deletion
+                await releaseObjectLock(selectedObjectId);
                 setSelectedObjectId(null);
               }
             }
@@ -84,7 +88,7 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-      }, [selectedObjectId, deleteObjectOptimistic]);
+      }, [selectedObjectId, deleteObjectOptimistic, releaseObjectLock]);
 
   // Constrain viewport to boundaries
   const constrainViewport = useCallback((newViewport: ViewportState): ViewportState => {
@@ -108,12 +112,28 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
     };
   }, []);
 
-  // Handle rectangle click
-  const handleRectangleClick = useCallback((objectId: string) => {
+  // Handle rectangle click with locking
+  const handleRectangleClick = useCallback(async (objectId: string) => {
     if (activeTool === 'select') {
-      setSelectedObjectId(prev => prev === objectId ? null : objectId);
+      // If already selected, deselect and release lock
+      if (selectedObjectId === objectId) {
+        await releaseObjectLock(objectId);
+        setSelectedObjectId(null);
+        return;
+      }
+
+      // Try to acquire lock on the object
+      const lockAcquired = await acquireObjectLock(objectId);
+      if (lockAcquired) {
+        // Release previous selection's lock if any
+        if (selectedObjectId) {
+          await releaseObjectLock(selectedObjectId);
+        }
+        setSelectedObjectId(objectId);
+      }
+      // If lock not acquired, selectedObjectId stays the same (don't select)
     }
-  }, [activeTool]);
+  }, [activeTool, selectedObjectId, acquireObjectLock, releaseObjectLock]);
 
   // Convert screen coordinates to canvas coordinates (accounting for zoom/pan)
   const screenToCanvasCoords = useCallback((screenX: number, screenY: number) => {
@@ -154,11 +174,16 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
       }, []);
 
   const handleRectangleDragMove = useCallback((objectId: string, x: number, y: number) => {
+    // Only allow drag moves if user has acquired the lock (safety check)
+    const object = objects.find(obj => obj.id === objectId);
+    if (!object || object.lockedBy !== user?.id) {
+      console.warn(`Drag blocked: User ${user?.id} doesn't own lock on ${objectId}`);
+      return;
+    }
+
     // Constrain to canvas boundaries during drag
     const constrainedX = Math.max(0, Math.min(x, CANVAS_WIDTH - 100)); // Assume 100px width
     const constrainedY = Math.max(0, Math.min(y, CANVAS_HEIGHT - 100)); // Assume 100px height
-
-    if (!user?.id) return;
 
     // Update object position with optimistic updates and Firestore sync
     updateObjectOptimistic(objectId, {
@@ -166,14 +191,14 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
       y: constrainedY,
       modifiedBy: user.id
     });
-  }, [user?.id, updateObjectOptimistic]);
+  }, [user?.id, updateObjectOptimistic, objects]);
 
       const handleRectangleDragEnd = useCallback((_objectId: string, _x: number, _y: number) => {
         // TODO: Send position update to Firestore in Phase 4
       }, []);
 
       // Handle mouse down for panning and tool interactions
-      const handleMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
+      const handleMouseDown = useCallback(async (e: Konva.KonvaEventObject<MouseEvent>) => {
         const stage = e.target.getStage();
         if (!stage) return;
 
@@ -183,8 +208,11 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
           if (!pos) return;
 
           if (activeTool === 'select') {
-            // Deselect any selected object when clicking on empty area
-            setSelectedObjectId(null);
+            // Release any selected object's lock when clicking on empty area
+            if (selectedObjectId) {
+              await releaseObjectLock(selectedObjectId);
+              setSelectedObjectId(null);
+            }
 
             // Start panning
             setIsPanning(true);
@@ -194,7 +222,7 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
             handleCreateRectangle(pos.x, pos.y);
           }
         }
-      }, [activeTool, handleCreateRectangle]);
+      }, [activeTool, handleCreateRectangle, selectedObjectId, releaseObjectLock]);
 
   // Handle mouse move for panning
   const handleMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -339,6 +367,14 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
               onDragStart={handleRectangleDragStart}
               onDragMove={handleRectangleDragMove}
               onDragEnd={handleRectangleDragEnd}
+              currentUserId={user?.id}
+              users={{
+                // Simple user mapping - in a real app, this would come from a users context/service
+                [user?.id || '']: {
+                  displayName: user?.displayName || 'You',
+                  cursorColor: user?.cursorColor || '#007AFF'
+                }
+              }}
             />
           ))}
         </Layer>

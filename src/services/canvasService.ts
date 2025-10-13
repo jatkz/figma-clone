@@ -1,6 +1,7 @@
 import { 
   doc, 
   getDoc, 
+  getDocs,
   setDoc, 
   collection,
   onSnapshot,
@@ -295,6 +296,165 @@ export const createObjectsBatch = async (objects: CanvasObjectInput[]): Promise<
   } catch (error) {
     console.error('Error in batch object creation:', error);
     throw new Error('Failed to create objects in batch');
+  }
+};
+
+/**
+ * Acquire a lock on a canvas object
+ * @param objectId ID of the object to lock
+ * @param userId ID of the user requesting the lock
+ * @returns Promise resolving to true if lock acquired, false if already locked
+ */
+export const acquireLock = async (objectId: string, userId: string): Promise<boolean> => {
+  try {
+    console.log(`🔒 Attempting to acquire lock on ${objectId} for user ${userId}`);
+    
+    const objectDocRef = doc(db, OBJECTS_COLLECTION_PATH, objectId);
+    
+    const result = await runTransaction(db, async (transaction) => {
+      const objectDoc = await transaction.get(objectDocRef);
+      
+      if (!objectDoc.exists()) {
+        throw new Error(`Object with ID ${objectId} not found`);
+      }
+      
+      const currentData = objectDoc.data() as CanvasObject;
+      
+      // Check if object is already locked
+      if (currentData.lockedBy && currentData.lockedBy !== userId) {
+        // Check if lock is expired (older than 30 seconds)
+        const lockAge = Date.now() - (currentData.lockedAt || 0);
+        const LOCK_TIMEOUT = 30 * 1000; // 30 seconds
+        
+        if (lockAge < LOCK_TIMEOUT) {
+          console.log(`❌ Object ${objectId} is locked by ${currentData.lockedBy}`);
+          return false; // Lock is still valid
+        }
+        
+        console.log(`⏰ Lock on ${objectId} has expired, acquiring for ${userId}`);
+      }
+      
+      // Acquire the lock
+      const lockData = {
+        lockedBy: userId,
+        lockedAt: Date.now(),
+        version: currentData.version + 1
+      };
+      
+      transaction.update(objectDocRef, lockData);
+      console.log(`✅ Lock acquired on ${objectId} for user ${userId}`);
+      return true;
+    });
+    
+    return result;
+  } catch (error) {
+    console.error('Error acquiring lock:', error);
+    
+    if (error instanceof Error && error.message.includes('not found')) {
+      throw error; // Re-throw not found errors
+    }
+    
+    return false; // Return false for other errors (conflict, network, etc.)
+  }
+};
+
+/**
+ * Release a lock on a canvas object
+ * @param objectId ID of the object to unlock
+ * @param userId ID of the user releasing the lock
+ * @returns Promise resolving to true if lock released, false if user doesn't own lock
+ */
+export const releaseLock = async (objectId: string, userId: string): Promise<boolean> => {
+  try {
+    console.log(`🔓 Attempting to release lock on ${objectId} for user ${userId}`);
+    
+    const objectDocRef = doc(db, OBJECTS_COLLECTION_PATH, objectId);
+    
+    const result = await runTransaction(db, async (transaction) => {
+      const objectDoc = await transaction.get(objectDocRef);
+      
+      if (!objectDoc.exists()) {
+        console.warn(`Object with ID ${objectId} not found, considering lock released`);
+        return true; // Object doesn't exist, so lock is effectively released
+      }
+      
+      const currentData = objectDoc.data() as CanvasObject;
+      
+      // Check if user owns the lock
+      if (currentData.lockedBy !== userId) {
+        console.warn(`❌ User ${userId} does not own lock on ${objectId} (owned by ${currentData.lockedBy})`);
+        return false;
+      }
+      
+      // Release the lock
+      const unlockData = {
+        lockedBy: null,
+        lockedAt: null,
+        version: currentData.version + 1
+      };
+      
+      transaction.update(objectDocRef, unlockData);
+      console.log(`✅ Lock released on ${objectId} by user ${userId}`);
+      return true;
+    });
+    
+    return result;
+  } catch (error) {
+    console.error('Error releasing lock:', error);
+    return false;
+  }
+};
+
+/**
+ * Release expired locks on all objects (cleanup function)
+ * @param userId Current user ID (to avoid releasing own locks unnecessarily)
+ * @returns Promise resolving to number of locks released
+ */
+export const releaseExpiredLocks = async (userId: string): Promise<number> => {
+  try {
+    console.log('🧹 Checking for expired locks...');
+    
+    const objectsCollectionRef = collection(db, OBJECTS_COLLECTION_PATH);
+    const snapshot = await getDocs(objectsCollectionRef);
+    
+    let releasedCount = 0;
+    const LOCK_TIMEOUT = 30 * 1000; // 30 seconds
+    const now = Date.now();
+    
+    const promises = snapshot.docs.map(async (docSnapshot) => {
+      const objectData = docSnapshot.data() as CanvasObject;
+      
+      // Skip if not locked or locked by current user
+      if (!objectData.lockedBy || objectData.lockedBy === userId) {
+        return;
+      }
+      
+      // Check if lock is expired
+      const lockAge = now - (objectData.lockedAt || 0);
+      if (lockAge > LOCK_TIMEOUT) {
+        console.log(`⏰ Releasing expired lock on ${docSnapshot.id} (${lockAge}ms old)`);
+        
+        try {
+          const success = await releaseLock(docSnapshot.id, objectData.lockedBy);
+          if (success) {
+            releasedCount++;
+          }
+        } catch (error) {
+          console.warn(`Failed to release expired lock on ${docSnapshot.id}:`, error);
+        }
+      }
+    });
+    
+    await Promise.all(promises);
+    
+    if (releasedCount > 0) {
+      console.log(`✅ Released ${releasedCount} expired locks`);
+    }
+    
+    return releasedCount;
+  } catch (error) {
+    console.error('Error checking for expired locks:', error);
+    return 0;
   }
 };
 

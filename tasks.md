@@ -255,21 +255,21 @@
   - **On error: rollback to last known good state**
 
 ### 4.3 Object Locking System
-- [ ] Implement `acquireLock(objectId, userId)`:
+- [x] Implement `acquireLock(objectId, userId)`:
   - Use Firestore transaction
   - Check if object.lockedBy is null
   - If yes, set lockedBy and lockedAt (timestamp)
   - Return success/failure
-- [ ] Implement `releaseLock(objectId, userId)`:
+- [x] Implement `releaseLock(objectId, userId)`:
   - Check if user owns lock
   - Set lockedBy to null
   - Clear lockedAt
-- [ ] Implement lock timeout checker (client-side):
+- [x] Implement lock timeout checker (client-side):
   - Run every 5 seconds
   - Check all objects for locks > 30 seconds old
   - Optimistically release expired locks using transaction
   - Handle race conditions gracefully
-- [ ] Add lock status to Rectangle component:
+- [x] Add lock status to Rectangle component:
   - Show colored border if locked by another user (red/user's cursor color)
   - Show different color if locked by current user (blue)
   - Display username label near locked object
