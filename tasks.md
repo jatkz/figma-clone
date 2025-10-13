@@ -30,7 +30,7 @@
 ### 1.2 Firebase Setup
 - [ ] Create new Firebase project in console
 - [ ] Enable Firestore Database
-- [ ] Create environment variables file (.env)
+- [x] Create environment variables file (.env)
   ```
   VITE_FIREBASE_API_KEY=
   VITE_FIREBASE_AUTH_DOMAIN=
@@ -39,8 +39,8 @@
   VITE_FIREBASE_MESSAGING_SENDER_ID=
   VITE_FIREBASE_APP_ID=
   ```
-- [ ] Initialize Firebase in `src/config/firebase.ts`
-- [ ] Setup Firestore security rules (from PRD Appendix)
+- [x] Initialize Firebase in `src/config/firebase.ts`
+- [x] Setup Firestore security rules (from PRD Appendix)
 
 ### 1.3 Auth0 Setup
 - [ ] Create Auth0 account and application
