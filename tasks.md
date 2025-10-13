@@ -8,15 +8,15 @@
 ## Phase 1: Project Setup & Infrastructure (Hours 0-2)
 
 ### 1.1 Initialize Project
-- [ ] Create new React + TypeScript project with Vite
+- [x] Create new React + TypeScript project with Vite
   - `npm create vite@latest collabcanvas -- --template react-ts`
-- [ ] Install core dependencies:
+- [x] Install core dependencies:
   - `react-konva konva`
   - `firebase`
   - `@auth0/auth0-react`
   - `tailwindcss`
-- [ ] Setup Tailwind CSS configuration
-- [ ] Create basic folder structure:
+- [x] Setup Tailwind CSS configuration
+- [x] Create basic folder structure:
   ```
   src/
   ├── components/
