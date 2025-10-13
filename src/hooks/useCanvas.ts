@@ -122,7 +122,7 @@ export const useCanvas = (): UseCanvasReturn => {
     };
   }, []);
 
-  // Throttled Firestore update function (300ms for optimal performance/cost balance)
+  // Throttled Firestore update function (500ms for production-grade efficiency)
   const throttledFirestoreUpdate = useCallback(
     throttle(async (objectId: string, updates: CanvasObjectUpdate) => {
       try {
@@ -141,7 +141,7 @@ export const useCanvas = (): UseCanvasReturn => {
         // Clear pending update
         pendingUpdatesRef.current.delete(objectId);
       }
-    }, 300),
+    }, 500),
     []
   );
 

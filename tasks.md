@@ -250,7 +250,7 @@
   - **On error: rollback local state, show error toast**
 - [x] Handle object updates:
   - Update locally immediately
-  - Throttle Firestore updates (300ms)
+  - Throttle Firestore updates (500ms)
   - Batch multiple changes if possible
   - **On error: rollback to last known good state**
 
