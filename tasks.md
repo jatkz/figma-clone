@@ -172,14 +172,14 @@
 - [x] Handle click events on rectangles
 
 ### 3.4 Rectangle Creation
-- [ ] Implement canvas click handler
-- [ ] When Rectangle tool is active and canvas clicked:
+- [x] Implement canvas click handler
+- [x] When Rectangle tool is active and canvas clicked:
   - Get click position (account for zoom/pan)
   - Check if position is within canvas boundaries (0-5000)
   - Create local object with 100x100 size and random color
   - Generate temporary ID
   - Add to local state optimistically
-- [ ] Create `src/utils/objectFactory.ts`:
+- [x] Create `src/utils/objectFactory.ts`:
   ```typescript
   import { CURSOR_COLORS } from './colors';
   

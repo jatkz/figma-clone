@@ -24,6 +24,7 @@ function App() {
           </div>
         </header>
 
+
         {/* Main content area - Canvas and Tool Panel */}
         <main className="flex-1 overflow-hidden flex">
           {/* Tool Panel */}
@@ -45,5 +46,6 @@ function App() {
     </div>
   );
 }
+
 
 export default App;

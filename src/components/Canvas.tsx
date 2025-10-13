@@ -10,6 +10,8 @@ import {
 import type { CanvasObject } from '../types/canvas';
 import type { ToolType } from './ToolPanel';
 import Rectangle from './Rectangle';
+import { createRectangle, generateTempId, isWithinCanvasBounds } from '../utils/objectFactory';
+import { useAuth } from '../hooks/useAuth';
 
 interface ViewportState {
   x: number;
@@ -21,14 +23,16 @@ interface CanvasProps {
   activeTool: ToolType;
 }
 
+
 const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
   const stageRef = useRef<Konva.Stage>(null);
+  const { user } = useAuth();
   
   // Viewport state: centered at canvas center initially
   const [viewport, setViewport] = useState<ViewportState>({
     x: -CANVAS_CENTER_X, // Negative because we want to center the canvas
     y: -CANVAS_CENTER_Y,
-    scale: 1,
+    scale: 1.0, // Back to 100% zoom for clear canvas visibility
   });
 
   // Track if we're currently panning
@@ -38,52 +42,7 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
 
   // Canvas objects and selection state
   const [objects, setObjects] = useState<CanvasObject[]>([
-    // Demo objects for testing rendering (will be replaced with Firestore data)
-    {
-      id: 'demo-1',
-      type: 'rectangle',
-      x: 2400,
-      y: 2400,
-      width: 150,
-      height: 100,
-      color: '#FF6B6B',
-      rotation: 0,
-      createdBy: 'demo-user',
-      modifiedBy: 'demo-user',
-      lockedBy: null,
-      lockedAt: null,
-      version: 1,
-    },
-    {
-      id: 'demo-2',
-      type: 'rectangle',
-      x: 2600,
-      y: 2300,
-      width: 120,
-      height: 120,
-      color: '#4ECDC4',
-      rotation: 15,
-      createdBy: 'demo-user',
-      modifiedBy: 'demo-user',
-      lockedBy: 'other-user',
-      lockedAt: Date.now(),
-      version: 1,
-    },
-    {
-      id: 'demo-3',
-      type: 'rectangle',
-      x: 2300,
-      y: 2600,
-      width: 200,
-      height: 80,
-      color: '#45B7D1',
-      rotation: -10,
-      createdBy: 'demo-user',
-      modifiedBy: 'demo-user',
-      lockedBy: null,
-      lockedAt: null,
-      version: 1,
-    },
+    // Empty array - objects will come from Firestore in Phase 4
   ]);
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
 
@@ -100,6 +59,23 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
     window.addEventListener('resize', updateSize);
     return () => window.removeEventListener('resize', updateSize);
   }, []);
+
+      // Handle keyboard events (delete selected rectangle)
+      useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+          if (e.key === 'Delete' || e.key === 'Backspace') {
+            if (selectedObjectId) {
+              // Delete selected rectangle
+              setObjects(prev => prev.filter(obj => obj.id !== selectedObjectId));
+              setSelectedObjectId(null);
+              // TODO: Send delete to Firestore in Phase 4
+            }
+          }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+      }, [selectedObjectId]);
 
   // Constrain viewport to boundaries
   const constrainViewport = useCallback((newViewport: ViewportState): ViewportState => {
@@ -130,49 +106,88 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
     }
   }, [activeTool]);
 
-  // Handle rectangle drag events
-  const handleRectangleDragStart = useCallback((objectId: string) => {
-    console.log(`Rectangle ${objectId} drag started`);
-  }, []);
+  // Convert screen coordinates to canvas coordinates (accounting for zoom/pan)
+  const screenToCanvasCoords = useCallback((screenX: number, screenY: number) => {
+    const canvasX = (screenX - viewport.x) / viewport.scale;
+    const canvasY = (screenY - viewport.y) / viewport.scale;
+    return { x: canvasX, y: canvasY };
+  }, [viewport]);
+
+      // Handle rectangle creation
+      const handleCreateRectangle = useCallback((screenX: number, screenY: number) => {
+        if (!user?.id) {
+          return;
+        }
+
+        // Convert screen coordinates to canvas coordinates
+        const { x, y } = screenToCanvasCoords(screenX, screenY);
+
+        // Check if position is within canvas boundaries
+        if (!isWithinCanvasBounds(x, y)) {
+          return;
+        }
+
+        // Create new rectangle object
+        const newRectangle = createRectangle(x, y, user.id);
+        const tempId = generateTempId();
+
+        // Add to local state optimistically
+        const rectangleWithId: CanvasObject = {
+          id: tempId,
+          ...newRectangle,
+        };
+
+        setObjects(prev => [...prev, rectangleWithId]);
+
+        // Auto-select the newly created rectangle
+        setSelectedObjectId(tempId);
+
+        // TODO: Send to Firestore in Phase 4
+      }, [user?.id, screenToCanvasCoords]);
+
+      // Handle rectangle drag events
+      const handleRectangleDragStart = useCallback((_objectId: string) => {
+        // TODO: Add drag start logic if needed
+      }, []);
 
   const handleRectangleDragMove = useCallback((objectId: string, x: number, y: number) => {
+    // Constrain to canvas boundaries during drag
+    const constrainedX = Math.max(0, Math.min(x, CANVAS_WIDTH - 100)); // Assume 100px width
+    const constrainedY = Math.max(0, Math.min(y, CANVAS_HEIGHT - 100)); // Assume 100px height
+
     // Update object position locally (optimistic update)
     setObjects(prev => prev.map(obj => 
-      obj.id === objectId ? { ...obj, x, y } : obj
+      obj.id === objectId ? { ...obj, x: constrainedX, y: constrainedY } : obj
     ));
   }, []);
 
-  const handleRectangleDragEnd = useCallback((objectId: string, x: number, y: number) => {
-    console.log(`Rectangle ${objectId} moved to: (${x}, ${y})`);
-    // TODO: Send position update to Firestore in Phase 4
-  }, []);
+      const handleRectangleDragEnd = useCallback((_objectId: string, _x: number, _y: number) => {
+        // TODO: Send position update to Firestore in Phase 4
+      }, []);
 
-  // Handle mouse down for panning and tool interactions
-  const handleMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
-    const stage = e.target.getStage();
-    if (!stage) return;
+      // Handle mouse down for panning and tool interactions
+      const handleMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
+        const stage = e.target.getStage();
+        if (!stage) return;
 
-    // Only start panning if clicking on empty area (the stage itself) and using select tool
-    if (e.target === stage) {
-      if (activeTool === 'select') {
-        // Deselect any selected object when clicking on empty area
-        setSelectedObjectId(null);
-        
-        setIsPanning(true);
-        const pos = stage.getPointerPosition();
-        if (pos) {
-          setLastPointerPosition(pos);
+        // Only handle clicks on empty area (the stage itself)
+        if (e.target === stage) {
+          const pos = stage.getPointerPosition();
+          if (!pos) return;
+
+          if (activeTool === 'select') {
+            // Deselect any selected object when clicking on empty area
+            setSelectedObjectId(null);
+
+            // Start panning
+            setIsPanning(true);
+            setLastPointerPosition(pos);
+          } else if (activeTool === 'rectangle') {
+            // Create rectangle at click position
+            handleCreateRectangle(pos.x, pos.y);
+          }
         }
-      } else if (activeTool === 'rectangle') {
-        // Rectangle creation will be implemented in task 3.4
-        const pos = stage.getPointerPosition();
-        if (pos) {
-          console.log(`Rectangle tool clicked at: (${Math.round(pos.x)}, ${Math.round(pos.y)})`);
-          // TODO: Implement rectangle creation in task 3.4
-        }
-      }
-    }
-  }, [activeTool]);
+      }, [activeTool, handleCreateRectangle]);
 
   // Handle mouse move for panning
   const handleMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -231,29 +246,7 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
 
   return (
     <div className="w-full h-full bg-gray-100 overflow-hidden relative">
-      {/* Canvas info overlay */}
-      <div className="absolute top-4 left-4 bg-white bg-opacity-90 rounded-lg px-3 py-2 shadow-md z-10">
-        <div className="text-sm text-gray-700">
-          <div>Zoom: {Math.round(viewport.scale * 100)}%</div>
-          <div>Position: ({Math.round(-viewport.x)}, {Math.round(-viewport.y)})</div>
-          <div>Objects: {objects.length}</div>
-          {selectedObjectId && <div className="text-blue-600">Selected: {selectedObjectId}</div>}
-        </div>
-      </div>
 
-      {/* Tool and Canvas info */}
-      <div className="absolute top-4 right-4 bg-white bg-opacity-90 rounded-lg px-3 py-2 shadow-md z-10">
-        <div className="text-sm text-gray-700">
-          <div className="flex items-center gap-2">
-            <span className={`
-              w-2 h-2 rounded-full
-              ${activeTool === 'rectangle' ? 'bg-blue-500' : 'bg-gray-400'}
-            `}></span>
-            <span className="capitalize">{activeTool} Tool</span>
-          </div>
-          <div>Canvas: {CANVAS_WIDTH} × {CANVAS_HEIGHT}</div>
-        </div>
-      </div>
 
       <Stage
         ref={stageRef}
@@ -358,6 +351,7 @@ const CanvasBoundary: React.FC<{ width: number; height: number }> = ({
       fill="#ffffff"
       stroke="#374151"
       strokeWidth={2}
+      listening={false} // This prevents the boundary from intercepting clicks
     />
   );
 };
