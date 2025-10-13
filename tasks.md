@@ -159,10 +159,10 @@
 - [x] Add canvas boundary constraints (0-5000 for both x and y)
 
 ### 3.2 Tool Panel
-- [ ] Create `src/components/ToolPanel.tsx`
-- [ ] Add Rectangle tool button
-- [ ] Track active tool in local state (not synced)
-- [ ] Visual indicator for active tool
+- [x] Create `src/components/ToolPanel.tsx`
+- [x] Add Rectangle tool button
+- [x] Track active tool in local state (not synced)
+- [x] Visual indicator for active tool
 - [ ] *(Keyboard shortcuts out of scope for MVP)*
 
 ### 3.3 Rectangle Rendering

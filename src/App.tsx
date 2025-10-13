@@ -1,9 +1,12 @@
 import ProtectedRoute from './components/ProtectedRoute';
 import LogoutButton from './components/LogoutButton';
 import Canvas from './components/Canvas';
+import ToolPanel, { useToolState } from './components/ToolPanel';
 import './App.css';
 
 function App() {
+  const { activeTool, setActiveTool } = useToolState('select');
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <ProtectedRoute>
@@ -21,11 +24,20 @@ function App() {
           </div>
         </header>
 
-        {/* Main content area - Canvas */}
-        <main className="flex-1 overflow-hidden">
-          <div className="h-full p-4">
+        {/* Main content area - Canvas and Tool Panel */}
+        <main className="flex-1 overflow-hidden flex">
+          {/* Tool Panel */}
+          <div className="p-4 flex-shrink-0">
+            <ToolPanel 
+              activeTool={activeTool}
+              onToolChange={setActiveTool}
+            />
+          </div>
+          
+          {/* Canvas Area */}
+          <div className="flex-1 p-4 pl-0">
             <div className="bg-white rounded-lg shadow h-full">
-              <Canvas />
+              <Canvas activeTool={activeTool} />
             </div>
           </div>
         </main>

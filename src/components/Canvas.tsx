@@ -7,6 +7,7 @@ import {
   CANVAS_CENTER_X, 
   CANVAS_CENTER_Y 
 } from '../types/canvas';
+import type { ToolType } from './ToolPanel';
 
 interface ViewportState {
   x: number;
@@ -14,7 +15,11 @@ interface ViewportState {
   scale: number;
 }
 
-const Canvas: React.FC = () => {
+interface CanvasProps {
+  activeTool: ToolType;
+}
+
+const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
   const stageRef = useRef<Konva.Stage>(null);
   
   // Viewport state: centered at canvas center initially
@@ -65,20 +70,29 @@ const Canvas: React.FC = () => {
     };
   }, []);
 
-  // Handle mouse down for panning
+  // Handle mouse down for panning and tool interactions
   const handleMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     const stage = e.target.getStage();
     if (!stage) return;
 
-    // Only start panning if clicking on empty area (the stage itself)
+    // Only start panning if clicking on empty area (the stage itself) and using select tool
     if (e.target === stage) {
-      setIsPanning(true);
-      const pos = stage.getPointerPosition();
-      if (pos) {
-        setLastPointerPosition(pos);
+      if (activeTool === 'select') {
+        setIsPanning(true);
+        const pos = stage.getPointerPosition();
+        if (pos) {
+          setLastPointerPosition(pos);
+        }
+      } else if (activeTool === 'rectangle') {
+        // Rectangle creation will be implemented in task 3.4
+        const pos = stage.getPointerPosition();
+        if (pos) {
+          console.log(`Rectangle tool clicked at: (${Math.round(pos.x)}, ${Math.round(pos.y)})`);
+          // TODO: Implement rectangle creation in task 3.4
+        }
       }
     }
-  }, []);
+  }, [activeTool]);
 
   // Handle mouse move for panning
   const handleMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -145,10 +159,17 @@ const Canvas: React.FC = () => {
         </div>
       </div>
 
-      {/* Canvas boundaries indicator */}
+      {/* Tool and Canvas info */}
       <div className="absolute top-4 right-4 bg-white bg-opacity-90 rounded-lg px-3 py-2 shadow-md z-10">
         <div className="text-sm text-gray-700">
-          Canvas: {CANVAS_WIDTH} × {CANVAS_HEIGHT}
+          <div className="flex items-center gap-2">
+            <span className={`
+              w-2 h-2 rounded-full
+              ${activeTool === 'rectangle' ? 'bg-blue-500' : 'bg-gray-400'}
+            `}></span>
+            <span className="capitalize">{activeTool} Tool</span>
+          </div>
+          <div>Canvas: {CANVAS_WIDTH} × {CANVAS_HEIGHT}</div>
         </div>
       </div>
 
@@ -165,6 +186,10 @@ const Canvas: React.FC = () => {
         onMouseUp={handleMouseUp}
         onWheel={handleWheel}
         draggable={false} // We handle dragging manually for better control
+        style={{
+          cursor: activeTool === 'rectangle' ? 'crosshair' : 
+                  isPanning ? 'grabbing' : 'grab'
+        }}
       >
         <Layer>
           {/* Canvas background grid */}
