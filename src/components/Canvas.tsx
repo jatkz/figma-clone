@@ -7,7 +7,9 @@ import {
   CANVAS_CENTER_X, 
   CANVAS_CENTER_Y 
 } from '../types/canvas';
+import type { CanvasObject } from '../types/canvas';
 import type { ToolType } from './ToolPanel';
+import Rectangle from './Rectangle';
 
 interface ViewportState {
   x: number;
@@ -33,6 +35,57 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
   const [isPanning, setIsPanning] = useState(false);
   const [lastPointerPosition, setLastPointerPosition] = useState({ x: 0, y: 0 });
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
+
+  // Canvas objects and selection state
+  const [objects, setObjects] = useState<CanvasObject[]>([
+    // Demo objects for testing rendering (will be replaced with Firestore data)
+    {
+      id: 'demo-1',
+      type: 'rectangle',
+      x: 2400,
+      y: 2400,
+      width: 150,
+      height: 100,
+      color: '#FF6B6B',
+      rotation: 0,
+      createdBy: 'demo-user',
+      modifiedBy: 'demo-user',
+      lockedBy: null,
+      lockedAt: null,
+      version: 1,
+    },
+    {
+      id: 'demo-2',
+      type: 'rectangle',
+      x: 2600,
+      y: 2300,
+      width: 120,
+      height: 120,
+      color: '#4ECDC4',
+      rotation: 15,
+      createdBy: 'demo-user',
+      modifiedBy: 'demo-user',
+      lockedBy: 'other-user',
+      lockedAt: Date.now(),
+      version: 1,
+    },
+    {
+      id: 'demo-3',
+      type: 'rectangle',
+      x: 2300,
+      y: 2600,
+      width: 200,
+      height: 80,
+      color: '#45B7D1',
+      rotation: -10,
+      createdBy: 'demo-user',
+      modifiedBy: 'demo-user',
+      lockedBy: null,
+      lockedAt: null,
+      version: 1,
+    },
+  ]);
+  const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
 
   // Update stage size on window resize
   useEffect(() => {
@@ -70,6 +123,30 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
     };
   }, []);
 
+  // Handle rectangle click
+  const handleRectangleClick = useCallback((objectId: string) => {
+    if (activeTool === 'select') {
+      setSelectedObjectId(prev => prev === objectId ? null : objectId);
+    }
+  }, [activeTool]);
+
+  // Handle rectangle drag events
+  const handleRectangleDragStart = useCallback((objectId: string) => {
+    console.log(`Rectangle ${objectId} drag started`);
+  }, []);
+
+  const handleRectangleDragMove = useCallback((objectId: string, x: number, y: number) => {
+    // Update object position locally (optimistic update)
+    setObjects(prev => prev.map(obj => 
+      obj.id === objectId ? { ...obj, x, y } : obj
+    ));
+  }, []);
+
+  const handleRectangleDragEnd = useCallback((objectId: string, x: number, y: number) => {
+    console.log(`Rectangle ${objectId} moved to: (${x}, ${y})`);
+    // TODO: Send position update to Firestore in Phase 4
+  }, []);
+
   // Handle mouse down for panning and tool interactions
   const handleMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     const stage = e.target.getStage();
@@ -78,6 +155,9 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
     // Only start panning if clicking on empty area (the stage itself) and using select tool
     if (e.target === stage) {
       if (activeTool === 'select') {
+        // Deselect any selected object when clicking on empty area
+        setSelectedObjectId(null);
+        
         setIsPanning(true);
         const pos = stage.getPointerPosition();
         if (pos) {
@@ -156,6 +236,8 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
         <div className="text-sm text-gray-700">
           <div>Zoom: {Math.round(viewport.scale * 100)}%</div>
           <div>Position: ({Math.round(-viewport.x)}, {Math.round(-viewport.y)})</div>
+          <div>Objects: {objects.length}</div>
+          {selectedObjectId && <div className="text-blue-600">Selected: {selectedObjectId}</div>}
         </div>
       </div>
 
@@ -205,7 +287,18 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
             height={CANVAS_HEIGHT}
           />
           
-          {/* Objects will be rendered here in future tasks */}
+          {/* Render canvas objects */}
+          {objects.map(object => (
+            <Rectangle
+              key={object.id}
+              object={object}
+              isSelected={selectedObjectId === object.id}
+              onClick={handleRectangleClick}
+              onDragStart={handleRectangleDragStart}
+              onDragMove={handleRectangleDragMove}
+              onDragEnd={handleRectangleDragEnd}
+            />
+          ))}
         </Layer>
       </Stage>
     </div>

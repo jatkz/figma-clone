@@ -166,10 +166,10 @@
 - [ ] *(Keyboard shortcuts out of scope for MVP)*
 
 ### 3.3 Rectangle Rendering
-- [ ] Create `src/components/Rectangle.tsx` (Konva Rect)
-- [ ] Render rectangles from objects array
-- [ ] Apply position, size, color, rotation from object data
-- [ ] Handle click events on rectangles
+- [x] Create `src/components/Rectangle.tsx` (Konva Rect)
+- [x] Render rectangles from objects array
+- [x] Apply position, size, color, rotation from object data
+- [x] Handle click events on rectangles
 
 ### 3.4 Rectangle Creation
 - [ ] Implement canvas click handler
