@@ -1,38 +1,27 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // TEMPORARY: Open rules for MVP development
+    // TODO: Implement proper Auth0 + Firebase custom token authentication
+    
     // Single global canvas document
     match /canvas {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read, write: if true;
     }
     
     // Objects subcollection
     match /canvas/objects/{objectId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null && (
-        // Can update if unlocked, or if you hold the lock
-        !resource.data.keys().hasAny(['lockedBy']) ||
-        resource.data.lockedBy == null ||
-        resource.data.lockedBy == request.auth.uid
-      );
-      allow delete: if request.auth != null && (
-        // Can delete if you created it or hold the lock
-        resource.data.createdBy == request.auth.uid ||
-        resource.data.lockedBy == request.auth.uid
-      );
+      allow read, write: if true;
     }
     
-    // Cursors subcollection - users can only write their own cursor
+    // Cursors subcollection
     match /canvas/cursors/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if true;
     }
     
+    // Users collection - temporarily open for MVP
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth.uid == userId;
+      allow read, write: if true;
     }
   }
 }
