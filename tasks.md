@@ -238,19 +238,19 @@
   - No soft delete
 
 ### 4.2 Real-time Canvas State
-- [ ] Create `src/hooks/useCanvas.ts`:
+- [x] Create `src/hooks/useCanvas.ts`:
   - Subscribe to `/canvas/objects` subcollection on mount
   - Maintain local objects array
   - Sync with Firestore updates
   - Handle optimistic updates
-- [ ] Handle object creation flow:
+- [x] Handle object creation flow:
   - Create locally (optimistic)
   - Send to Firestore
   - Update local object with returned ID
   - **On error: rollback local state, show error toast**
-- [ ] Handle object updates:
+- [x] Handle object updates:
   - Update locally immediately
-  - Throttle Firestore updates (50ms)
+  - Throttle Firestore updates (300ms)
   - Batch multiple changes if possible
   - **On error: rollback to last known good state**
 

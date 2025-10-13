@@ -1,17 +1,17 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { Stage, Layer, Line, Rect } from 'react-konva';
 import Konva from 'konva';
-import { 
-  CANVAS_WIDTH, 
-  CANVAS_HEIGHT, 
-  CANVAS_CENTER_X, 
-  CANVAS_CENTER_Y 
+import {
+  CANVAS_WIDTH,
+  CANVAS_HEIGHT,
+  CANVAS_CENTER_X,
+  CANVAS_CENTER_Y
 } from '../types/canvas';
-import type { CanvasObject } from '../types/canvas';
 import type { ToolType } from './ToolPanel';
 import Rectangle from './Rectangle';
-import { createRectangle, generateTempId, isWithinCanvasBounds } from '../utils/objectFactory';
+import { createRectangle, isWithinCanvasBounds } from '../utils/objectFactory';
 import { useAuth } from '../hooks/useAuth';
+import { useCanvas } from '../hooks/useCanvas';
 
 interface ViewportState {
   x: number;
@@ -27,7 +27,18 @@ interface CanvasProps {
 const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
   const stageRef = useRef<Konva.Stage>(null);
   const { user } = useAuth();
-  
+
+  // Real-time canvas state from Firestore
+  const { 
+    objects, 
+    isLoading, 
+    error, 
+    isConnected,
+    createObjectOptimistic,
+    updateObjectOptimistic,
+    deleteObjectOptimistic 
+  } = useCanvas();
+
   // Viewport state: centered at canvas center initially
   const [viewport, setViewport] = useState<ViewportState>({
     x: -CANVAS_CENTER_X, // Negative because we want to center the canvas
@@ -40,10 +51,7 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
   const [lastPointerPosition, setLastPointerPosition] = useState({ x: 0, y: 0 });
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
 
-  // Canvas objects and selection state
-  const [objects, setObjects] = useState<CanvasObject[]>([
-    // Empty array - objects will come from Firestore in Phase 4
-  ]);
+  // Selection state (local only, not synced)
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
 
   // Update stage size on window resize
@@ -62,20 +70,21 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
 
       // Handle keyboard events (delete selected rectangle)
       useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
+        const handleKeyDown = async (e: KeyboardEvent) => {
           if (e.key === 'Delete' || e.key === 'Backspace') {
             if (selectedObjectId) {
-              // Delete selected rectangle
-              setObjects(prev => prev.filter(obj => obj.id !== selectedObjectId));
-              setSelectedObjectId(null);
-              // TODO: Send delete to Firestore in Phase 4
+              // Delete selected rectangle with Firestore sync
+              const success = await deleteObjectOptimistic(selectedObjectId);
+              if (success) {
+                setSelectedObjectId(null);
+              }
             }
           }
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-      }, [selectedObjectId]);
+      }, [selectedObjectId, deleteObjectOptimistic]);
 
   // Constrain viewport to boundaries
   const constrainViewport = useCallback((newViewport: ViewportState): ViewportState => {
@@ -113,8 +122,8 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
     return { x: canvasX, y: canvasY };
   }, [viewport]);
 
-      // Handle rectangle creation
-      const handleCreateRectangle = useCallback((screenX: number, screenY: number) => {
+      // Handle rectangle creation with Firestore sync
+      const handleCreateRectangle = useCallback(async (screenX: number, screenY: number) => {
         if (!user?.id) {
           return;
         }
@@ -129,21 +138,15 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
 
         // Create new rectangle object
         const newRectangle = createRectangle(x, y, user.id);
-        const tempId = generateTempId();
 
-        // Add to local state optimistically
-        const rectangleWithId: CanvasObject = {
-          id: tempId,
-          ...newRectangle,
-        };
+        // Create with optimistic updates and Firestore sync
+        const createdObject = await createObjectOptimistic(newRectangle);
 
-        setObjects(prev => [...prev, rectangleWithId]);
-
-        // Auto-select the newly created rectangle
-        setSelectedObjectId(tempId);
-
-        // TODO: Send to Firestore in Phase 4
-      }, [user?.id, screenToCanvasCoords]);
+        // Auto-select the newly created rectangle if successful
+        if (createdObject) {
+          setSelectedObjectId(createdObject.id);
+        }
+      }, [user?.id, screenToCanvasCoords, createObjectOptimistic]);
 
       // Handle rectangle drag events
       const handleRectangleDragStart = useCallback((_objectId: string) => {
@@ -155,11 +158,15 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
     const constrainedX = Math.max(0, Math.min(x, CANVAS_WIDTH - 100)); // Assume 100px width
     const constrainedY = Math.max(0, Math.min(y, CANVAS_HEIGHT - 100)); // Assume 100px height
 
-    // Update object position locally (optimistic update)
-    setObjects(prev => prev.map(obj => 
-      obj.id === objectId ? { ...obj, x: constrainedX, y: constrainedY } : obj
-    ));
-  }, []);
+    if (!user?.id) return;
+
+    // Update object position with optimistic updates and Firestore sync
+    updateObjectOptimistic(objectId, {
+      x: constrainedX,
+      y: constrainedY,
+      modifiedBy: user.id
+    });
+  }, [user?.id, updateObjectOptimistic]);
 
       const handleRectangleDragEnd = useCallback((_objectId: string, _x: number, _y: number) => {
         // TODO: Send position update to Firestore in Phase 4
@@ -244,8 +251,50 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
     setViewport(newViewport);
   }, [viewport, constrainViewport]);
 
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="w-full h-full bg-gray-100 overflow-hidden relative flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Connecting to canvas...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show connection error
+  if (error && !isConnected) {
+    return (
+      <div className="w-full h-full bg-gray-100 overflow-hidden relative flex items-center justify-center">
+        <div className="text-center p-8 bg-white rounded-lg shadow-md max-w-md">
+          <div className="text-red-600 text-4xl mb-4">⚠️</div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Connection Error</h3>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+          >
+            Retry Connection
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full h-full bg-gray-100 overflow-hidden relative">
+      {/* Connection Status Indicator */}
+      <div className="absolute top-4 left-4 bg-white bg-opacity-90 rounded-lg px-3 py-2 shadow-md z-10">
+        <div className="flex items-center gap-2 text-sm">
+          <div className={`w-2 h-2 rounded-full ${
+            isConnected ? 'bg-green-500' : 'bg-red-500'
+          }`}></div>
+          <span className="text-gray-700">
+            {isConnected ? 'Connected' : 'Disconnected'} • {objects.length} objects
+          </span>
+        </div>
+      </div>
 
 
       <Stage
