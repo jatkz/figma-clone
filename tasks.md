@@ -28,8 +28,8 @@
   ```
 
 ### 1.2 Firebase Setup
-- [ ] Create new Firebase project in console
-- [ ] Enable Firestore Database
+- [x] Create new Firebase project in console
+- [x] Enable Firestore Database
 - [x] Create environment variables file (.env)
   ```
   VITE_FIREBASE_API_KEY=
@@ -51,7 +51,7 @@
   VITE_AUTH0_CLIENT_ID=
   VITE_AUTH0_AUDIENCE=
   ```
-- [ ] Create Auth0 config file `src/config/auth0.ts`
+- [x] Create Auth0 config file `src/config/auth0.ts`
 
 ### 1.4 Vercel Setup
 - [ ] Create Vercel account
