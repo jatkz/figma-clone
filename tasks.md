@@ -144,19 +144,19 @@
 ## Phase 3: Canvas Core (Hours 4-8)
 
 ### 3.1 Canvas Setup
-- [ ] Create `src/components/Canvas.tsx` with Konva Stage
-- [ ] Implement viewport state (pan/zoom):
+- [x] Create `src/components/Canvas.tsx` with Konva Stage
+- [x] Implement viewport state (pan/zoom):
   - Track scale (0.1 to 4.0)
   - Track offset (x, y)
   - Initial position: centered at (2500, 2500)
-- [ ] Implement pan functionality:
+- [x] Implement pan functionality:
   - Mouse down + drag on empty area
   - Update stage position
-- [ ] Implement zoom functionality:
+- [x] Implement zoom functionality:
   - Wheel event listener
   - Zoom toward cursor position
   - Clamp zoom range
-- [ ] Add canvas boundary constraints (0-5000 for both x and y)
+- [x] Add canvas boundary constraints (0-5000 for both x and y)
 
 ### 3.2 Tool Panel
 - [ ] Create `src/components/ToolPanel.tsx`
