@@ -217,23 +217,23 @@
 ## Phase 4: Firestore Integration (Hours 8-14)
 
 ### 4.1 Firestore Service
-- [ ] Create `src/services/canvasService.ts`
-- [ ] Implement `initializeCanvas()`:
+- [x] Create `src/services/canvasService.ts`
+- [x] Implement `initializeCanvas()`:
   - Check if global canvas document exists at `/canvas/global`
   - Create if not exists with empty structure
-- [ ] Implement `subscribeToObjects(callback)`:
+- [x] Implement `subscribeToObjects(callback)`:
   - Real-time listener on `/canvas/objects` subcollection
   - Return unsubscribe function
-- [ ] Implement `createObject(object)`:
+- [x] Implement `createObject(object)`:
   - Add to `/canvas/objects` subcollection
   - Firestore generates auto-ID
   - Return created object with ID
-- [ ] Implement `updateObject(objectId, updates)`:
+- [x] Implement `updateObject(objectId, updates)`:
   - Update specific fields
   - Increment version number
   - Set modifiedBy
   - Handle rollback on error
-- [ ] Implement `deleteObject(objectId)`:
+- [x] Implement `deleteObject(objectId)`:
   - Permanent deletion from Firestore
   - No soft delete
 

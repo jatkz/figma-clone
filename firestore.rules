@@ -4,18 +4,18 @@ service cloud.firestore {
     // TEMPORARY: Open rules for MVP development
     // TODO: Implement proper Auth0 + Firebase custom token authentication
     
-    // Single global canvas document
-    match /canvas {
+    // Canvas collection (including the global document)
+    match /canvas/{document} {
       allow read, write: if true;
     }
     
-    // Objects subcollection
-    match /canvas/objects/{objectId} {
+    // Objects subcollection under canvas/global
+    match /canvas/global/objects/{objectId} {
       allow read, write: if true;
     }
     
-    // Cursors subcollection
-    match /canvas/cursors/{userId} {
+    // Cursors subcollection under canvas/global  
+    match /canvas/global/cursors/{userId} {
       allow read, write: if true;
     }
     
