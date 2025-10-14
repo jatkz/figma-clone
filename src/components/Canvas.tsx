@@ -10,6 +10,7 @@ import {
 import type { ToolType } from './ToolPanel';
 import Rectangle from './Rectangle';
 import { createRectangle, isWithinCanvasBounds } from '../utils/objectFactory';
+import { constrainToBounds } from '../utils/constrainToBounds';
 import { useAuth } from '../hooks/useAuth';
 import { useCanvas } from '../hooks/useCanvas';
 import { useToastContext, createToastFunction } from '../contexts/ToastContext';
@@ -189,10 +190,18 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
         }
       }, [user?.id, screenToCanvasCoords, createObjectOptimistic]);
 
-      // Handle rectangle drag events
-      const handleRectangleDragStart = useCallback((_objectId: string) => {
-        // TODO: Add drag start logic if needed
-      }, []);
+  // Handle rectangle drag events
+  const handleRectangleDragStart = useCallback((objectId: string) => {
+    // Verify the user has the lock before allowing drag
+    const object = objects.find(obj => obj.id === objectId);
+    if (!object || object.lockedBy !== user?.id) {
+      console.warn(`Drag start blocked: User ${user?.id} doesn't own lock on ${objectId}`);
+      return false; // Prevent drag
+    }
+    
+    console.log(`🎯 Drag started for object ${objectId} by user ${user.id}`);
+    return true; // Allow drag
+  }, [objects, user?.id]);
 
   const handleRectangleDragMove = useCallback((objectId: string, x: number, y: number) => {
     // Only allow drag moves if user has acquired the lock (safety check)
@@ -202,21 +211,41 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
       return;
     }
 
-    // Constrain to canvas boundaries during drag
-    const constrainedX = Math.max(0, Math.min(x, CANVAS_WIDTH - 100)); // Assume 100px width
-    const constrainedY = Math.max(0, Math.min(y, CANVAS_HEIGHT - 100)); // Assume 100px height
+    // Constrain to canvas boundaries during drag using the utility
+    const constrainedPosition = constrainToBounds(x, y, object.width, object.height);
 
-    // Update object position with optimistic updates and Firestore sync
+    // Update object position with optimistic updates and throttled Firestore sync
+    // The useCanvas hook already handles throttling at 500ms
     updateObjectOptimistic(objectId, {
-      x: constrainedX,
-      y: constrainedY,
+      x: constrainedPosition.x,
+      y: constrainedPosition.y,
       modifiedBy: user.id
     });
   }, [user?.id, updateObjectOptimistic, objects]);
 
-      const handleRectangleDragEnd = useCallback((_objectId: string, _x: number, _y: number) => {
-        // TODO: Send position update to Firestore in Phase 4
-      }, []);
+  const handleRectangleDragEnd = useCallback(async (objectId: string, x: number, y: number) => {
+    // Verify the user still has the lock 
+    const object = objects.find(obj => obj.id === objectId);
+    if (!object || object.lockedBy !== user?.id) {
+      console.warn(`Drag end blocked: User ${user?.id} doesn't own lock on ${objectId}`);
+      return;
+    }
+
+    // Constrain final position to canvas boundaries
+    const constrainedPosition = constrainToBounds(x, y, object.width, object.height);
+    
+    console.log(`🏁 Drag ended for object ${objectId} at position (${constrainedPosition.x}, ${constrainedPosition.y})`);
+
+    // Send final position update to Firestore (this will override any pending throttled updates)
+    await updateObjectOptimistic(objectId, {
+      x: constrainedPosition.x,
+      y: constrainedPosition.y,
+      modifiedBy: user.id
+    });
+
+    // Keep lock active - user still has the rectangle selected for further editing
+    console.log(`🔒 Lock maintained on ${objectId} after drag completion`);
+  }, [objects, user?.id, updateObjectOptimistic]);
 
       // Handle mouse down for panning and tool interactions
       const handleMouseDown = useCallback(async (e: Konva.KonvaEventObject<MouseEvent>) => {

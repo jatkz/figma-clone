@@ -1,12 +1,13 @@
 import React from 'react';
 import { Rect, Text } from 'react-konva';
 import type { CanvasObject } from '../types/canvas';
+import { constrainToBounds } from '../utils/constrainToBounds';
 
 interface RectangleProps {
   object: CanvasObject;
   isSelected?: boolean;
   onClick?: (objectId: string) => void;
-  onDragStart?: (objectId: string) => void;
+  onDragStart?: (objectId: string) => boolean; // Now returns boolean to indicate if drag should be allowed
   onDragMove?: (objectId: string, x: number, y: number) => void;
   onDragEnd?: (objectId: string, x: number, y: number) => void;
   currentUserId?: string;
@@ -27,13 +28,35 @@ const Rectangle: React.FC<RectangleProps> = ({
     onClick?.(object.id);
   };
 
-  const handleDragStart = () => {
-    onDragStart?.(object.id);
+  const handleDragStart = (e: any) => {
+    // Check with parent if drag should be allowed
+    const allowDrag = onDragStart?.(object.id) ?? true;
+    
+    if (!allowDrag) {
+      // Prevent the drag by stopping the event
+      e.evt.preventDefault();
+      e.cancelBubble = true;
+      return false;
+    }
+    
+    return true;
   };
 
   const handleDragMove = (e: any) => {
     const { x, y } = e.target.attrs;
-    onDragMove?.(object.id, x, y);
+    
+    // First, constrain the position using our utility
+    const constrainedPosition = constrainToBounds(x, y, object.width, object.height);
+    
+    // If position was constrained, update the visual element immediately
+    if (constrainedPosition.x !== x || constrainedPosition.y !== y) {
+      e.target.x(constrainedPosition.x);
+      e.target.y(constrainedPosition.y);
+      console.log('🔄 Visual position corrected:', { original: { x, y }, constrained: constrainedPosition });
+    }
+    
+    // Always call with the constrained position
+    onDragMove?.(object.id, constrainedPosition.x, constrainedPosition.y);
   };
 
   const handleDragEnd = (e: any) => {

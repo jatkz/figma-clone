@@ -285,18 +285,18 @@
 - [x] On delete, release lock automatically
 
 ### 4.5 Object Movement
-- [ ] Add drag handlers to Rectangle component
-- [ ] On drag start:
+- [x] Add drag handlers to Rectangle component
+- [x] On drag start:
   - Check if current user has lock
   - If not, prevent drag
-- [ ] During drag:
+- [x] During drag:
   - Update position locally (no lag)
   - **Constrain to canvas boundaries (0-5000)**
-  - Throttle Firestore updates to 50ms
-- [ ] On drag end:
+  - Throttle Firestore updates to 500ms (optimized from 50ms for better performance)
+- [x] On drag end:
   - Send final position to Firestore
   - Keep lock active
-- [ ] Implement boundary checking utility:
+- [x] Implement boundary checking utility:
   ```typescript
   export const constrainToBounds = (
     x: number, 
@@ -304,8 +304,8 @@
     width: number, 
     height: number
   ) => ({
-    x: Math.max(0, Math.min(x, 5000 - width)),
-    y: Math.max(0, Math.min(y, 5000 - height))
+    x: Math.max(0, Math.min(x, CANVAS_WIDTH - width)),
+    y: Math.max(0, Math.min(y, CANVAS_HEIGHT - height))
   });
   ```
 
