@@ -55,10 +55,7 @@ const PresenceIndicator: React.FC<PresenceIndicatorProps> = () => {
   }
 
   return (
-    <div 
-      className="flex items-center bg-white rounded-lg shadow-sm border border-gray-200 px-4 py-2.5 min-w-fit"
-      style={{ gap: '6px' }}
-    >
+    <div className="flex items-center gap-6 bg-white rounded-lg shadow-sm border border-gray-200 px-4 py-2.5 min-w-fit">
       {/* Online indicator and count */}
       <div className="flex items-center gap-2 flex-shrink-0">
         <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
