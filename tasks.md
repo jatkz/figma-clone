@@ -314,14 +314,14 @@
 ## Phase 5: Multiplayer Features (Hours 14-20)
 
 ### 5.1 Cursor Tracking
-- [ ] Add mouse move listener to Stage
-- [ ] Track cursor position in local state
-- [ ] Convert screen coordinates to canvas coordinates (account for zoom/pan)
-- [ ] Throttle cursor updates to 50ms
-- [ ] Update cursor in Firestore subcollection:
+- [x] Add mouse move listener to Stage
+- [x] Track cursor position in local state
+- [x] Convert screen coordinates to canvas coordinates (account for zoom/pan)
+- [x] Throttle cursor updates to 500ms
+- [x] Update cursor in Firestore subcollection:
   ```typescript
   // Each user writes to their OWN cursor document to avoid write contention
-  setDoc(doc(db, 'canvas', 'cursors', userId), {
+  setDoc(doc(db, 'canvas/global/cursors', userId), {
     x, 
     y,
     name: user.displayName,

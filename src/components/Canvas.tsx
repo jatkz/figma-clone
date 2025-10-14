@@ -14,6 +14,27 @@ import { constrainToBounds } from '../utils/constrainToBounds';
 import { useAuth } from '../hooks/useAuth';
 import { useCanvas } from '../hooks/useCanvas';
 import { useToastContext, createToastFunction } from '../contexts/ToastContext';
+import { updateCursor } from '../services/canvasService';
+
+// Throttle utility for cursor updates
+const throttle = <T extends (...args: any[]) => void>(func: T, delay: number): T => {
+  let timeoutId: number | null = null;
+  let lastArgs: Parameters<T> | null = null;
+
+  return ((...args: Parameters<T>) => {
+    lastArgs = args;
+
+    if (timeoutId === null) {
+      timeoutId = window.setTimeout(() => {
+        if (lastArgs) {
+          func(...lastArgs);
+        }
+        timeoutId = null;
+        lastArgs = null;
+      }, delay);
+    }
+  }) as T;
+};
 
 interface ViewportState {
   x: number;
@@ -66,6 +87,25 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
 
   // Selection state (local only, not synced)
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
+
+  // Cursor position state for multiplayer cursor tracking
+  const [, setCursorPosition] = useState<{ x: number; y: number } | null>(null);
+
+  // Throttled cursor update function (500ms throttle)
+  const throttledCursorUpdate = useCallback(
+    throttle(async (x: number, y: number) => {
+      if (!user?.id || !user?.displayName || !user?.cursorColor) {
+        return;
+      }
+      
+      try {
+        await updateCursor(user.id, x, y, user.displayName, user.cursorColor);
+      } catch (error) {
+        console.warn('Failed to update cursor position:', error);
+      }
+    }, 500),
+    [user?.id, user?.displayName, user?.cursorColor]
+  );
 
   // Update stage size on window resize
   useEffect(() => {
@@ -163,6 +203,12 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
     const canvasY = (screenY - viewport.y) / viewport.scale;
     return { x: canvasX, y: canvasY };
   }, [viewport]);
+
+  // Convert stage coordinates to canvas coordinates for cursor tracking
+  const stageToCanvasCoords = useCallback((stageX: number, stageY: number) => {
+    // Stage coordinates are already in the viewport space, so we can use the same conversion
+    return screenToCanvasCoords(stageX, stageY);
+  }, [screenToCanvasCoords]);
 
       // Handle rectangle creation with Firestore sync
       const handleCreateRectangle = useCallback(async (screenX: number, screenY: number) => {
@@ -275,28 +321,38 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
         }
       }, [activeTool, handleCreateRectangle, selectedObjectId, releaseObjectLock]);
 
-  // Handle mouse move for panning
+  // Handle mouse move for panning and cursor tracking
   const handleMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
-    if (!isPanning) return;
-
     const stage = e.target.getStage();
     if (!stage) return;
 
     const pos = stage.getPointerPosition();
     if (!pos) return;
 
-    const dx = pos.x - lastPointerPosition.x;
-    const dy = pos.y - lastPointerPosition.y;
+    // Handle panning if active
+    if (isPanning) {
+      const dx = pos.x - lastPointerPosition.x;
+      const dy = pos.y - lastPointerPosition.y;
 
-    const newViewport = constrainViewport({
-      ...viewport,
-      x: viewport.x + dx,
-      y: viewport.y + dy,
-    });
+      const newViewport = constrainViewport({
+        ...viewport,
+        x: viewport.x + dx,
+        y: viewport.y + dy,
+      });
 
-    setViewport(newViewport);
-    setLastPointerPosition(pos);
-  }, [isPanning, lastPointerPosition, viewport, constrainViewport]);
+      setViewport(newViewport);
+      setLastPointerPosition(pos);
+    }
+
+    // Always track cursor position for multiplayer (convert to canvas coordinates)
+    const canvasCoords = stageToCanvasCoords(pos.x, pos.y);
+    setCursorPosition(canvasCoords);
+    
+    // Throttled update to Firestore (only if user is authenticated)
+    if (user?.id) {
+      throttledCursorUpdate(canvasCoords.x, canvasCoords.y);
+    }
+  }, [isPanning, lastPointerPosition, viewport, constrainViewport, stageToCanvasCoords, user?.id, throttledCursorUpdate]);
 
   // Handle mouse up to stop panning
   const handleMouseUp = useCallback(() => {

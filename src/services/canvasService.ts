@@ -23,6 +23,7 @@ import type { CanvasObject } from '../types/canvas';
 // Canvas document path
 const CANVAS_DOC_PATH = 'canvas/global';
 const OBJECTS_COLLECTION_PATH = 'canvas/global/objects';
+const CURSORS_COLLECTION_PATH = 'canvas/global/cursors';
 
 // Type definitions for canvas data structures
 interface CanvasDocument {
@@ -42,6 +43,15 @@ interface CanvasObjectInput extends Omit<CanvasObject, 'id'> {
 interface CanvasObjectUpdate extends Partial<Omit<CanvasObject, 'id' | 'createdBy' | 'version'>> {
   // For updates, we can't change id, createdBy, or version (version is handled automatically)
   modifiedBy: string; // This is required for updates
+}
+
+// Cursor data structure for multiplayer cursor tracking
+export interface CursorData {
+  x: number;
+  y: number;
+  name: string;
+  color: string;
+  lastSeen: number;
 }
 
 /**
@@ -454,6 +464,119 @@ export const releaseExpiredLocks = async (userId: string): Promise<number> => {
     return releasedCount;
   } catch (error) {
     console.error('Error checking for expired locks:', error);
+    return 0;
+  }
+};
+
+/**
+ * Update cursor position for multiplayer cursor tracking
+ * Each user writes to their OWN cursor document to avoid write contention
+ * @param userId ID of the user
+ * @param x Canvas x coordinate
+ * @param y Canvas y coordinate
+ * @param name User display name
+ * @param color User cursor color
+ * @returns Promise that resolves when cursor is updated
+ */
+export const updateCursor = async (
+  userId: string,
+  x: number,
+  y: number,
+  name: string,
+  color: string
+): Promise<void> => {
+  try {
+    const cursorDocRef = doc(db, CURSORS_COLLECTION_PATH, userId);
+    const cursorData: CursorData = {
+      x,
+      y,
+      name,
+      color,
+      lastSeen: Date.now()
+    };
+
+    await setDoc(cursorDocRef, cursorData);
+    console.log(`📍 Cursor updated for user ${userId} at (${x}, ${y})`);
+  } catch (error) {
+    console.error('Error updating cursor:', error);
+    // Don't throw error for cursor updates - they're not critical
+  }
+};
+
+/**
+ * Subscribe to cursor positions for multiplayer cursor display
+ * @param callback Function to call with updated cursor data
+ * @returns Unsubscribe function to stop the listener
+ */
+export const subscribeToCursors = (
+  callback: (cursors: Map<string, CursorData>) => void
+): Unsubscribe => {
+  const cursorsCollectionRef = collection(db, CURSORS_COLLECTION_PATH);
+  console.log(`Subscribing to cursors at: ${CURSORS_COLLECTION_PATH}`);
+
+  const unsubscribe = onSnapshot(
+    cursorsCollectionRef,
+    (snapshot) => {
+      const cursors = new Map<string, CursorData>();
+      
+      snapshot.docs.forEach((doc) => {
+        const data = doc.data() as CursorData;
+        cursors.set(doc.id, data);
+      });
+      
+      console.log(`📍 Received ${cursors.size} cursor positions`);
+      callback(cursors);
+    },
+    (error) => {
+      console.error('Error setting up cursors subscription:', error);
+      // Call callback with empty map on error
+      callback(new Map());
+    }
+  );
+
+  return unsubscribe;
+};
+
+/**
+ * Clean up stale cursors (older than 30 seconds)
+ * @param excludeUserId Current user ID to exclude from cleanup
+ * @returns Promise resolving to number of cursors cleaned up
+ */
+export const cleanupStaleCursors = async (excludeUserId: string): Promise<number> => {
+  try {
+    console.log('🧹 Cleaning up stale cursors...');
+    
+    const cursorsCollectionRef = collection(db, CURSORS_COLLECTION_PATH);
+    const snapshot = await getDocs(cursorsCollectionRef);
+    
+    let cleanedCount = 0;
+    const staleThreshold = Date.now() - (30 * 1000); // 30 seconds ago
+    
+    const promises = snapshot.docs.map(async (docSnapshot) => {
+      const userId = docSnapshot.id;
+      const cursorData = docSnapshot.data() as CursorData;
+      
+      // Skip current user and check if cursor is stale
+      if (userId !== excludeUserId && cursorData.lastSeen < staleThreshold) {
+        console.log(`⏰ Removing stale cursor for user ${userId}`);
+        try {
+          await deleteDoc(docSnapshot.ref);
+          cleanedCount++;
+        } catch (error) {
+          console.warn(`Failed to remove stale cursor for ${userId}:`, error);
+        }
+      }
+    });
+    
+    await Promise.all(promises);
+    
+    if (cleanedCount > 0) {
+      console.log(`✅ Cleaned up ${cleanedCount} stale cursors`);
+    }
+    
+    return cleanedCount;
+  } catch (error) {
+    console.error('Error cleaning up stale cursors:', error);
     return 0;
   }
 };
