@@ -343,12 +343,12 @@
   - Simpler implementation, acceptable for 500ms update rate
 
 ### 5.3 Presence System
-- [ ] Create `src/components/PresenceIndicator.tsx`
-- [ ] Show online users count: "🟢 3 users"
-- [ ] List user avatars (first 5)
-- [ ] "+N more" if > 5 users
-- [ ] Click to expand full user list
-- [ ] Implement cursor cleanup:
+- [x] Create `src/components/PresenceIndicator.tsx`
+- [x] Show online users count: "🟢 3 users"
+- [x] List user avatars (first 5)
+- [x] "+N more" if > 5 users
+- [x] Click to expand full user list
+- [x] Implement cursor cleanup:
   - Remove cursors where lastSeen > 30 seconds
   - Run cleanup every 10 seconds
   - Query subcollection for stale cursors

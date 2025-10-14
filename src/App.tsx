@@ -4,6 +4,7 @@ import LogoutButton from './components/LogoutButton';
 import Canvas from './components/Canvas';
 import ToolPanel, { useToolState } from './components/ToolPanel';
 import FirestoreTest from './components/FirestoreTest';
+import PresenceIndicator from './components/PresenceIndicator';
 import { ToastProvider, useToastContext } from './contexts/ToastContext';
 import { ToastManager } from './components/Toast';
 import './App.css';
@@ -20,32 +21,40 @@ function AppContent() {
       <ToastManager toasts={toasts} onClose={removeToast} />
       
       <ProtectedRoute>
-        {/* Header with logout */}
-        <header className="bg-white shadow-sm border-b border-gray-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center h-16">
-              <div className="flex items-center">
-                <h1 className="text-2xl font-bold text-gray-900">
-                  CollabCanvas
-                </h1>
-                
-                
-                {/* Firestore Test Toggle */}
-                <button
-                  onClick={() => setShowFirestoreTest(!showFirestoreTest)}
-                  className={`ml-4 px-3 py-1 text-sm rounded-lg font-medium transition-colors ${
-                    showFirestoreTest 
-                      ? 'bg-orange-600 hover:bg-orange-700 text-white' 
-                      : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
-                  }`}
-                >
-                  🔥 Test Firestore
-                </button>
+          {/* Header with logout */}
+          <header className="bg-white shadow-sm border-b border-gray-200">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex justify-between items-center h-16 min-w-0">
+                <div className="flex items-center gap-6 min-w-0 flex-1">
+                  <h1 className="text-2xl font-bold text-gray-900 flex-shrink-0">
+                    CollabCanvas
+                  </h1>
+                  
+                  {/* Presence Indicator */}
+                  {!showFirestoreTest && (
+                    <div className="flex-shrink-0 min-w-fit">
+                      <PresenceIndicator />
+                    </div>
+                  )}
+
+                  {/* Firestore Test Toggle */}
+                  <button
+                    onClick={() => setShowFirestoreTest(!showFirestoreTest)}
+                    className={`px-3 py-1 text-sm rounded-lg font-medium transition-colors flex-shrink-0 ${
+                      showFirestoreTest 
+                        ? 'bg-orange-600 hover:bg-orange-700 text-white' 
+                        : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                    }`}
+                  >
+                    🔥 Test Firestore
+                  </button>
+                </div>
+                <div className="flex-shrink-0">
+                  <LogoutButton />
+                </div>
               </div>
-              <LogoutButton />
             </div>
-          </div>
-        </header>
+          </header>
 
         {/* Main content area - Canvas and Tool Panel OR Firestore Test */}
         <main className="flex-1 overflow-hidden">
