@@ -14,7 +14,8 @@ import { constrainToBounds } from '../utils/constrainToBounds';
 import { useAuth } from '../hooks/useAuth';
 import { useCanvas } from '../hooks/useCanvas';
 import { useToastContext, createToastFunction } from '../contexts/ToastContext';
-import { updateCursor } from '../services/canvasService';
+import { updateCursor, subscribeToCursors, type CursorData } from '../services/canvasService';
+import Cursor from './Cursor';
 
 // Throttle utility for cursor updates
 const throttle = <T extends (...args: any[]) => void>(func: T, delay: number): T => {
@@ -91,6 +92,9 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
   // Cursor position state for multiplayer cursor tracking
   const [, setCursorPosition] = useState<{ x: number; y: number } | null>(null);
 
+  // Other users' cursors from Firestore
+  const [otherCursors, setOtherCursors] = useState<Map<string, CursorData>>(new Map());
+
   // Throttled cursor update function (500ms throttle)
   const throttledCursorUpdate = useCallback(
     throttle(async (x: number, y: number) => {
@@ -121,25 +125,47 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
     return () => window.removeEventListener('resize', updateSize);
   }, []);
 
-      // Handle keyboard events (delete selected rectangle)
-      useEffect(() => {
-        const handleKeyDown = async (e: KeyboardEvent) => {
-          if (e.key === 'Delete' || e.key === 'Backspace') {
-            if (selectedObjectId) {
-              // Delete selected rectangle with Firestore sync
-              const success = await deleteObjectOptimistic(selectedObjectId);
-              if (success) {
-                // Release lock automatically on successful deletion
-                await releaseObjectLock(selectedObjectId);
-                setSelectedObjectId(null);
-              }
-            }
+  // Handle keyboard events (delete selected rectangle)
+  useEffect(() => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedObjectId) {
+          // Delete selected rectangle with Firestore sync
+          const success = await deleteObjectOptimistic(selectedObjectId);
+          if (success) {
+            // Release lock automatically on successful deletion
+            await releaseObjectLock(selectedObjectId);
+            setSelectedObjectId(null);
           }
-        };
+        }
+      }
+    };
 
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-      }, [selectedObjectId, deleteObjectOptimistic, releaseObjectLock]);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedObjectId, deleteObjectOptimistic, releaseObjectLock]);
+
+  // Set up cursor subscription for multiplayer cursors
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const cursorsUnsubscribe = subscribeToCursors((cursors) => {
+      // Filter out current user's cursor
+      const filteredCursors = new Map();
+      cursors.forEach((cursorData, userId) => {
+        if (userId !== user.id) {
+          filteredCursors.set(userId, cursorData);
+        }
+      });
+
+      console.log(`👥 Received ${filteredCursors.size} other user cursors`);
+      setOtherCursors(filteredCursors);
+    });
+
+    return () => {
+      cursorsUnsubscribe();
+    };
+  }, [user?.id]);
 
   // Constrain viewport to boundaries
   const constrainViewport = useCallback((newViewport: ViewportState): ViewportState => {
@@ -482,6 +508,15 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
                   cursorColor: user?.cursorColor || '#007AFF'
                 }
               }}
+            />
+          ))}
+
+          {/* Render other users' cursors (teleport positioning - instant updates) */}
+          {Array.from(otherCursors.entries()).map(([userId, cursorData]) => (
+            <Cursor
+              key={userId}
+              userId={userId}
+              cursorData={cursorData}
             />
           ))}
         </Layer>

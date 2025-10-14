@@ -331,16 +331,16 @@
   ```
 
 ### 5.2 Cursor Display
-- [ ] Create `src/components/Cursor.tsx` (Konva Group):
+- [x] Create `src/components/Cursor.tsx` (Konva Group):
   - Circle for cursor dot
   - Text label for username
-- [ ] Subscribe to `/canvas/cursors` subcollection
-- [ ] Filter out current user's cursor
-- [ ] Render cursor for each online user
-- [ ] **Use teleport positioning (instant, no interpolation)**:
+- [x] Subscribe to `/canvas/cursors` subcollection
+- [x] Filter out current user's cursor
+- [x] Render cursor for each online user
+- [x] **Use teleport positioning (instant, no interpolation)**:
   - Directly set cursor position from Firestore data
   - No smooth animation between positions
-  - Simpler implementation, acceptable for 50ms update rate
+  - Simpler implementation, acceptable for 500ms update rate
 
 ### 5.3 Presence System
 - [ ] Create `src/components/PresenceIndicator.tsx`
