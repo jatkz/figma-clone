@@ -422,8 +422,6 @@ export const releaseLock = async (objectId: string, userId: string): Promise<boo
  */
 export const releaseExpiredLocks = async (userId: string): Promise<number> => {
   try {
-    console.log('🧹 Checking for expired locks...');
-    
     const objectsCollectionRef = collection(db, OBJECTS_COLLECTION_PATH);
     const snapshot = await getDocs(objectsCollectionRef);
     
@@ -454,7 +452,7 @@ export const releaseExpiredLocks = async (userId: string): Promise<number> => {
         }
       }
     });
-    
+
     await Promise.all(promises);
     
     if (releasedCount > 0) {
@@ -544,8 +542,6 @@ export const subscribeToCursors = (
  */
 export const cleanupStaleCursors = async (excludeUserId: string): Promise<number> => {
   try {
-    console.log('🧹 Cleaning up stale cursors...');
-    
     const cursorsCollectionRef = collection(db, CURSORS_COLLECTION_PATH);
     const snapshot = await getDocs(cursorsCollectionRef);
     
