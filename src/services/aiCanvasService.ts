@@ -11,7 +11,7 @@ import {
   type CanvasObjectInput,
   type CanvasObjectUpdate 
 } from './canvasService';
-import type { CanvasObject } from '../types/canvas';
+import type { CanvasObject, RectangleObject, CircleObject, TextObject } from '../types/canvas';
 import {
   type CreateShapeParams,
   type MoveShapeParams,
@@ -26,6 +26,7 @@ import {
   parseColor,
   CANVAS_BOUNDS
 } from '../types/aiTools';
+import { getShapeDimensions } from '../utils/shapeUtils';
 
 // ============================================================================
 // Canvas State Management
@@ -162,18 +163,17 @@ export const aiCreateShape = async (
           version: 1,
           lockedBy: null,
           lockedAt: null,
-        };
+        } as RectangleObject;
         break;
         
       case 'circle':
-        // For now, create circles as rectangles (will be extended in 7.3)
-        width = height = Math.max(width, height); // Make it square
+        // Create proper circle objects
+        const radius = Math.max(width, height) / 2; // Use larger dimension as diameter, then halve for radius
         objectData = {
-          type: 'rectangle', // Will be 'circle' in 7.3
+          type: 'circle',
           x: validCoords.x,
           y: validCoords.y,
-          width,
-          height,
+          radius,
           color,
           rotation: 0,
           createdBy: userId,
@@ -181,19 +181,28 @@ export const aiCreateShape = async (
           version: 1,
           lockedBy: null,
           lockedAt: null,
-        };
+        } as CircleObject;
         break;
         
       case 'text':
-        // For now, create text as rectangles with specific styling (will be extended in 7.3)
-        width = (params.text?.length || 10) * (params.fontSize || 16) * 0.6;
-        height = params.fontSize || 16;
+        // Create proper text objects
+        const text = params.text || 'Sample Text';
+        const fontSize = params.fontSize || 16;
+        const textWidth = text.length * fontSize * 0.6;
+        const textHeight = fontSize * 1.2;
+        
         objectData = {
-          type: 'rectangle', // Will be 'text' in 7.3
+          type: 'text',
           x: validCoords.x,
           y: validCoords.y,
-          width,
-          height,
+          text,
+          fontSize,
+          fontFamily: 'Arial, sans-serif',
+          fontWeight: 'normal',
+          fontStyle: 'normal',
+          textAlign: 'left',
+          width: textWidth,
+          height: textHeight,
           color,
           rotation: 0,
           createdBy: userId,
@@ -201,7 +210,7 @@ export const aiCreateShape = async (
           version: 1,
           lockedBy: null,
           lockedAt: null,
-        };
+        } as TextObject;
         break;
         
       default:
@@ -247,9 +256,10 @@ export const aiMoveShape = async (
       };
     }
     
-    // Resolve and validate coordinates
+    // Resolve and validate coordinates  
     const coords = resolveCoordinates(params.x, params.y);
-    const validCoords = validateCoordinates(coords.x, coords.y, shape.width, shape.height);
+    const { width, height } = getShapeDimensions(shape);
+    const validCoords = validateCoordinates(coords.x, coords.y, width, height);
     
     const updates: CanvasObjectUpdate = {
       x: validCoords.x,
@@ -292,26 +302,69 @@ export const aiResizeShape = async (
       };
     }
     
-    // Validate size constraints
-    const width = Math.max(10, Math.min(1000, params.width));
-    const height = Math.max(10, Math.min(1000, params.height));
-    
-    // Ensure shape stays within canvas bounds after resize
-    const validCoords = validateCoordinates(shape.x, shape.y, width, height);
-    
-    const updates: CanvasObjectUpdate = {
-      x: validCoords.x,
-      y: validCoords.y,
-      width,
-      height,
+    // Validate size constraints and handle different shape types
+    let updates: CanvasObjectUpdate = {
       modifiedBy: userId
     };
     
+    if (shape.type === 'rectangle') {
+      const width = Math.max(10, Math.min(1000, params.width));
+      const height = Math.max(10, Math.min(1000, params.height));
+      
+      // Ensure shape stays within canvas bounds after resize
+      const validCoords = validateCoordinates(shape.x, shape.y, width, height);
+      
+      updates = {
+        x: validCoords.x,
+        y: validCoords.y,
+        width,
+        height,
+        modifiedBy: userId
+      };
+    } else if (shape.type === 'circle') {
+      const radius = Math.max(5, Math.min(500, Math.max(params.width, params.height) / 2));
+      
+      // Ensure circle stays within canvas bounds after resize
+      const validCoords = validateCoordinates(shape.x, shape.y, radius * 2, radius * 2);
+      
+      updates = {
+        x: validCoords.x,
+        y: validCoords.y,
+        radius,
+        modifiedBy: userId
+      };
+    } else if (shape.type === 'text') {
+      // For text, width and height affect the text box size
+      const width = Math.max(50, Math.min(1000, params.width));
+      const height = Math.max(20, Math.min(500, params.height));
+      
+      // Ensure text stays within canvas bounds after resize
+      const validCoords = validateCoordinates(shape.x, shape.y, width, height);
+      
+      updates = {
+        x: validCoords.x,
+        y: validCoords.y,
+        width,
+        height,
+        modifiedBy: userId
+      };
+    }
+    
     await updateObject(shape.id, updates);
+    
+    let message = `Resized ${shape.type}`;
+    if (shape.type === 'rectangle' || shape.type === 'text') {
+      const width = 'width' in updates ? updates.width : (shape as any).width;
+      const height = 'height' in updates ? updates.height : (shape as any).height;
+      message += ` to ${width}x${height}`;
+    } else if (shape.type === 'circle') {
+      const radius = 'radius' in updates ? updates.radius : (shape as any).radius;
+      message += ` to radius ${radius}`;
+    }
     
     return {
       success: true,
-      message: `Resized ${shape.type} to ${width}x${height}`,
+      message,
       objectIds: [shape.id]
     };
     
@@ -465,9 +518,13 @@ export const aiArrangeShapes = async (
         for (let i = 0; i < shapes.length; i++) {
           const shape = shapes[i];
           if (i > 0) {
-            currentX += shapes[i - 1].width + spacing;
+            const prevShape = shapes[i - 1];
+            const prevDimensions = getShapeDimensions(prevShape);
+            currentX += prevDimensions.width + spacing;
           }
-          const validCoords = validateCoordinates(currentX, shape.y, shape.width, shape.height);
+          
+          const shapeDimensions = getShapeDimensions(shape);
+          const validCoords = validateCoordinates(currentX, shape.y, shapeDimensions.width, shapeDimensions.height);
           updates.push({
             id: shape.id,
             updates: { x: validCoords.x, y: validCoords.y, modifiedBy: userId }
@@ -480,9 +537,13 @@ export const aiArrangeShapes = async (
         for (let i = 0; i < shapes.length; i++) {
           const shape = shapes[i];
           if (i > 0) {
-            currentY += shapes[i - 1].height + spacing;
+            const prevShape = shapes[i - 1];
+            const prevDimensions = getShapeDimensions(prevShape);
+            currentY += prevDimensions.height + spacing;
           }
-          const validCoords = validateCoordinates(shape.x, currentY, shape.width, shape.height);
+          
+          const shapeDimensions = getShapeDimensions(shape);
+          const validCoords = validateCoordinates(shape.x, currentY, shapeDimensions.width, shapeDimensions.height);
           updates.push({
             id: shape.id,
             updates: { x: validCoords.x, y: validCoords.y, modifiedBy: userId }
@@ -499,9 +560,11 @@ export const aiArrangeShapes = async (
           const shape = shapes[i];
           const row = Math.floor(i / columns);
           const col = i % columns;
-          const x = startX + col * (shape.width + spacing);
-          const y = startY + row * (shape.height + spacing);
-          const validCoords = validateCoordinates(x, y, shape.width, shape.height);
+          
+          const shapeDimensions = getShapeDimensions(shape);
+          const x = startX + col * (shapeDimensions.width + spacing);
+          const y = startY + row * (shapeDimensions.height + spacing);
+          const validCoords = validateCoordinates(x, y, shapeDimensions.width, shapeDimensions.height);
           updates.push({
             id: shape.id,
             updates: { x: validCoords.x, y: validCoords.y, modifiedBy: userId }
@@ -513,9 +576,10 @@ export const aiArrangeShapes = async (
         const centerX = CANVAS_BOUNDS.CENTER_X;
         const centerY = CANVAS_BOUNDS.CENTER_Y;
         for (const shape of shapes) {
-          const x = centerX - shape.width / 2;
-          const y = centerY - shape.height / 2;
-          const validCoords = validateCoordinates(x, y, shape.width, shape.height);
+          const shapeDimensions = getShapeDimensions(shape);
+          const x = centerX - shapeDimensions.width / 2;
+          const y = centerY - shapeDimensions.height / 2;
+          const validCoords = validateCoordinates(x, y, shapeDimensions.width, shapeDimensions.height);
           updates.push({
             id: shape.id,
             updates: { x: validCoords.x, y: validCoords.y, modifiedBy: userId }

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 // Define available tools
-export type ToolType = 'select' | 'rectangle';
+export type ToolType = 'select' | 'rectangle' | 'circle' | 'text';
 
 interface ToolPanelProps {
   activeTool: ToolType;
@@ -29,6 +29,24 @@ const ToolPanel: React.FC<ToolPanelProps> = ({ activeTool, onToolChange }) => {
         isActive={activeTool === 'rectangle'}
         onClick={() => onToolChange('rectangle')}
         shortcut="R"
+      />
+      
+      {/* Circle Tool */}
+      <ToolButton
+        icon={<CircleIcon />}
+        label="Circle"
+        isActive={activeTool === 'circle'}
+        onClick={() => onToolChange('circle')}
+        shortcut="C"
+      />
+      
+      {/* Text Tool */}
+      <ToolButton
+        icon={<TextIcon />}
+        label="Text"
+        isActive={activeTool === 'text'}
+        onClick={() => onToolChange('text')}
+        shortcut="T"
       />
     </div>
   );
@@ -92,6 +110,20 @@ const SelectIcon: React.FC = () => (
 const RectangleIcon: React.FC = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+  </svg>
+);
+
+const CircleIcon: React.FC = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="12" cy="12" r="9" />
+  </svg>
+);
+
+const TextIcon: React.FC = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="4,7 4,4 20,4 20,7" />
+    <line x1="9" y1="20" x2="15" y2="20" />
+    <line x1="12" y1="4" x2="12" y2="20" />
   </svg>
 );
 

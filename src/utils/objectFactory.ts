@@ -1,7 +1,7 @@
 import { CURSOR_COLORS } from './colors';
-import type { CanvasObject } from '../types/canvas';
+// Shape factory utilities
 
-export const createRectangle = (x: number, y: number, userId: string): Omit<CanvasObject, 'id'> => {
+export const createRectangle = (x: number, y: number, userId: string): any => {
   // Constrain to boundaries - leave room for 100px width/height
   const constrainedX = Math.max(0, Math.min(x, 4900)); 
   const constrainedY = Math.max(0, Math.min(y, 4900)); 

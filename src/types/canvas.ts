@@ -1,10 +1,8 @@
-export interface CanvasObject {
+// Base interface for all canvas objects
+export interface BaseCanvasObject {
   id: string;
-  type: 'rectangle';
   x: number; // constrained 0-5000
   y: number; // constrained 0-5000
-  width: number;
-  height: number;
   color: string; // randomly assigned
   rotation: number;
   createdBy: string;
@@ -13,6 +11,35 @@ export interface CanvasObject {
   lockedAt: number | null;
   version: number;
 }
+
+// Rectangle shape interface
+export interface RectangleObject extends BaseCanvasObject {
+  type: 'rectangle';
+  width: number;
+  height: number;
+}
+
+// Circle shape interface
+export interface CircleObject extends BaseCanvasObject {
+  type: 'circle';
+  radius: number;
+}
+
+// Text shape interface
+export interface TextObject extends BaseCanvasObject {
+  type: 'text';
+  text: string;
+  fontSize: number;
+  fontFamily?: string;
+  fontWeight?: 'normal' | 'bold';
+  fontStyle?: 'normal' | 'italic';
+  textAlign?: 'left' | 'center' | 'right';
+  width?: number; // For text wrapping
+  height?: number; // Auto-calculated based on content
+}
+
+// Union type for all canvas objects
+export type CanvasObject = RectangleObject | CircleObject | TextObject;
 
 export interface CursorData {
   x: number;

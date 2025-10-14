@@ -184,7 +184,7 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
     try {
       // Generate temporary ID for optimistic update
       const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-      const optimisticObject: CanvasObject = {
+      const optimisticObject: any = {
         ...objectData,
         id: tempId
       };
@@ -234,7 +234,7 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
 
       // 1. Update locally immediately
       console.log('🔄 Updating object optimistically:', objectId);
-      const updatedObject: CanvasObject = {
+      const updatedObject: any = {
         ...currentObject,
         ...updates,
         version: currentObject.version + 1

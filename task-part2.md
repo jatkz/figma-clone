@@ -34,13 +34,14 @@ Build an AI Canvas Agent that manipulates the collaborative canvas through natur
 - [x] Handle coordinate system conversions
 
 ### 7.3 Extended Canvas Objects
-- [ ] Add `Circle` shape type to `types/canvas.ts`
-- [ ] Add `Text` shape type to `types/canvas.ts`
-- [ ] Update Firestore schema for new object types
-- [ ] Create `Circle.tsx` component with Konva
-- [ ] Create `TextObject.tsx` component with Konva
-- [ ] Update `Canvas.tsx` to render new object types
-- [ ] Add creation tools for circles and text
+- [x] Add `Circle` shape type to `types/canvas.ts`
+- [x] Add `Text` shape type to `types/canvas.ts`
+- [x] Update Firestore schema for new object types
+- [x] Create `Circle.tsx` component with Konva
+- [x] Create `TextObject.tsx` component with Konva
+- [x] Update `Canvas.tsx` to render new object types
+- [x] Add creation tools for circles and text
+- [x] Fix TypeScript union type issues (follow-up task)
 
 ---
 

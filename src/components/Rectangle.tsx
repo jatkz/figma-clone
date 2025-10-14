@@ -1,17 +1,17 @@
 import React from 'react';
 import { Rect, Text } from 'react-konva';
-import type { CanvasObject } from '../types/canvas';
+import type { RectangleObject } from '../types/canvas';
 import { constrainToBounds } from '../utils/constrainToBounds';
 
 interface RectangleProps {
-  object: CanvasObject;
+  object: RectangleObject;
   isSelected?: boolean;
   onClick?: (objectId: string) => void;
   onDragStart?: (objectId: string) => boolean; // Now returns boolean to indicate if drag should be allowed
   onDragMove?: (objectId: string, x: number, y: number) => void;
   onDragEnd?: (objectId: string, x: number, y: number) => void;
   currentUserId?: string;
-  users?: { [userId: string]: { displayName: string; cursorColor: string } };
+  users?: Map<string, { displayName: string; cursorColor: string }> | { [userId: string]: { displayName: string; cursorColor: string } };
 }
 
 const Rectangle: React.FC<RectangleProps> = ({
@@ -67,7 +67,8 @@ const Rectangle: React.FC<RectangleProps> = ({
   // Determine lock status and colors
   const isLockedByCurrentUser = object.lockedBy === currentUserId;
   const isLockedByOther = object.lockedBy && !isLockedByCurrentUser;
-  const lockingUser = object.lockedBy ? users[object.lockedBy] : null;
+  const lockingUser = object.lockedBy ? 
+    (users instanceof Map ? users.get(object.lockedBy) : users?.[object.lockedBy]) : null;
   
   // Get lock border color
   const getLockBorderColor = () => {

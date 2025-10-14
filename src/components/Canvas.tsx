@@ -9,8 +9,11 @@ import {
 } from '../types/canvas';
 import type { ToolType } from './ToolPanel';
 import Rectangle from './Rectangle';
-import { createRectangle, isWithinCanvasBounds } from '../utils/objectFactory';
+import CircleComponent from './Circle';
+import TextObjectComponent from './TextObject';
+import { createNewRectangle, createNewCircle, createNewText, isWithinCanvasBounds } from '../utils/shapeFactory';
 import { constrainToBounds } from '../utils/constrainToBounds';
+import { getShapeDimensions } from '../utils/shapeUtils';
 import { useAuth } from '../hooks/useAuth';
 import { useCanvas } from '../hooks/useCanvas';
 import { useToastContext, createToastFunction } from '../contexts/ToastContext';
@@ -251,7 +254,7 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
         }
 
         // Create new rectangle object
-        const newRectangle = createRectangle(x, y, user.id);
+        const newRectangle = createNewRectangle(x, y, user.id);
 
         // Create with optimistic updates and Firestore sync
         const createdObject = await createObjectOptimistic(newRectangle);
@@ -261,6 +264,58 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
           setSelectedObjectId(createdObject.id);
         }
       }, [user?.id, screenToCanvasCoords, createObjectOptimistic]);
+
+  // Handle circle creation with Firestore sync
+  const handleCreateCircle = useCallback(async (screenX: number, screenY: number) => {
+    if (!user?.id) {
+      return;
+    }
+
+    // Convert screen coordinates to canvas coordinates
+    const { x, y } = screenToCanvasCoords(screenX, screenY);
+
+    // Check if position is within canvas boundaries
+    if (!isWithinCanvasBounds(x, y)) {
+      return;
+    }
+
+    // Create new circle object
+    const newCircle = createNewCircle(x, y, user.id);
+
+    // Create with optimistic updates and Firestore sync
+    const createdObject = await createObjectOptimistic(newCircle);
+
+    // Auto-select the newly created circle if successful
+    if (createdObject) {
+      setSelectedObjectId(createdObject.id);
+    }
+  }, [user?.id, screenToCanvasCoords, createObjectOptimistic]);
+
+  // Handle text creation with Firestore sync
+  const handleCreateText = useCallback(async (screenX: number, screenY: number) => {
+    if (!user?.id) {
+      return;
+    }
+
+    // Convert screen coordinates to canvas coordinates
+    const { x, y } = screenToCanvasCoords(screenX, screenY);
+
+    // Check if position is within canvas boundaries
+    if (!isWithinCanvasBounds(x, y)) {
+      return;
+    }
+
+    // Create new text object
+    const newText = createNewText(x, y, user.id);
+
+    // Create with optimistic updates and Firestore sync
+    const createdObject = await createObjectOptimistic(newText);
+
+    // Auto-select the newly created text if successful
+    if (createdObject) {
+      setSelectedObjectId(createdObject.id);
+    }
+  }, [user?.id, screenToCanvasCoords, createObjectOptimistic]);
 
   // Handle rectangle drag events
   const handleRectangleDragStart = useCallback((objectId: string) => {
@@ -283,8 +338,11 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
       return;
     }
 
+    // Get object dimensions properly for any shape type
+    const dimensions = getShapeDimensions(object);
+    
     // Constrain to canvas boundaries during drag using the utility
-    const constrainedPosition = constrainToBounds(x, y, object.width, object.height);
+    const constrainedPosition = constrainToBounds(x, y, dimensions.width, dimensions.height);
 
     // Update object position with optimistic updates and throttled Firestore sync
     // The useCanvas hook already handles throttling at 100ms
@@ -303,8 +361,11 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
       return;
     }
 
+    // Get object dimensions properly for any shape type  
+    const dimensions = getShapeDimensions(object);
+    
     // Constrain final position to canvas boundaries
-    const constrainedPosition = constrainToBounds(x, y, object.width, object.height);
+    const constrainedPosition = constrainToBounds(x, y, dimensions.width, dimensions.height);
     
     console.log(`🏁 Drag ended for object ${objectId} at position (${constrainedPosition.x}, ${constrainedPosition.y})`);
 
@@ -343,9 +404,15 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
           } else if (activeTool === 'rectangle') {
             // Create rectangle at click position
             handleCreateRectangle(pos.x, pos.y);
+          } else if (activeTool === 'circle') {
+            // Create circle at click position
+            handleCreateCircle(pos.x, pos.y);
+          } else if (activeTool === 'text') {
+            // Create text at click position
+            handleCreateText(pos.x, pos.y);
           }
         }
-      }, [activeTool, handleCreateRectangle, selectedObjectId, releaseObjectLock]);
+      }, [activeTool, handleCreateRectangle, handleCreateCircle, handleCreateText, selectedObjectId, releaseObjectLock]);
 
   // Handle mouse move for panning and cursor tracking
   const handleMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -461,7 +528,7 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
         onWheel={handleWheel}
         draggable={false} // We handle dragging manually for better control
         style={{
-          cursor: activeTool === 'rectangle' ? 'crosshair' : 
+          cursor: (activeTool === 'rectangle' || activeTool === 'circle' || activeTool === 'text') ? 'crosshair' : 
                   isPanning ? 'grabbing' : 'grab'
         }}
       >
@@ -480,25 +547,54 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
           />
           
           {/* Render canvas objects */}
-          {objects.map(object => (
-            <Rectangle
-              key={object.id}
-              object={object}
-              isSelected={selectedObjectId === object.id}
-              onClick={handleRectangleClick}
-              onDragStart={handleRectangleDragStart}
-              onDragMove={handleRectangleDragMove}
-              onDragEnd={handleRectangleDragEnd}
-              currentUserId={user?.id}
-              users={{
-                // Simple user mapping - in a real app, this would come from a users context/service
-                [user?.id || '']: {
-                  displayName: user?.displayName || 'You',
-                  cursorColor: user?.cursorColor || '#007AFF'
-                }
-              }}
-            />
-          ))}
+          {objects.map(object => {
+            const userMap = new Map();
+            if (user?.id) {
+              userMap.set(user.id, {
+                displayName: user.displayName || 'You',
+                cursorColor: user.cursorColor || '#007AFF'
+              });
+            }
+            
+            const sharedProps = {
+              key: object.id,
+              isSelected: selectedObjectId === object.id,
+              onSelect: handleRectangleClick,
+              onDeselect: () => handleRectangleClick(''),
+              onDragStart: handleRectangleDragStart,
+              onDragMove: handleRectangleDragMove,
+              onDragEnd: handleRectangleDragEnd,
+              currentUserId: user?.id,
+              users: userMap,
+            };
+
+            switch (object.type) {
+              case 'rectangle':
+                return (
+                  <Rectangle
+                    {...sharedProps}
+                    object={object}
+                    onClick={handleRectangleClick}
+                  />
+                );
+              case 'circle':
+                return (
+                  <CircleComponent
+                    {...sharedProps}
+                    circle={object}
+                  />
+                );
+              case 'text':
+                return (
+                  <TextObjectComponent
+                    {...sharedProps}
+                    textObject={object}
+                  />
+                );
+              default:
+                return null;
+            }
+          })}
 
           {/* Render other users' cursors (teleport positioning - instant updates) */}
           {Array.from(otherCursors.entries()).map(([userId, cursorData]) => (

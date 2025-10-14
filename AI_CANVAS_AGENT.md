@@ -31,6 +31,12 @@ window.aiTest.showExamples()
 
 // Try a random example
 await window.aiTest.command(window.aiTest.randomExample("create"))
+
+await window.aiTest.command("Create a blue rectangle, red circle, and green text")
+await window.aiTest.command("Arrange them in a horizontal row")     // ✅ Perfect spacing
+await window.aiTest.command("Make a 3x3 grid with mixed shapes")    // ✅ Proper layout  
+await window.aiTest.command("Center all the objects")              // ✅ Shape-aware centering
+await window.aiTest.command("Resize the circle to 100 pixels")     // ✅ Radius handling
 ```
 
 ## 🎨 Supported Commands

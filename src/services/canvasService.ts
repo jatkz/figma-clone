@@ -40,10 +40,26 @@ interface CanvasObjectInput extends Omit<CanvasObject, 'id'> {
   // For creating objects, we don't need the ID as Firestore will generate it
 }
 
-interface CanvasObjectUpdate extends Partial<Omit<CanvasObject, 'id' | 'createdBy' | 'version'>> {
-  // For updates, we can't change id, createdBy, or version (version is handled automatically)
-  modifiedBy: string; // This is required for updates
-}
+// Flexible update type that supports all object properties
+type CanvasObjectUpdate = Partial<{
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  radius: number;
+  text: string;
+  fontSize: number;
+  fontFamily: string;
+  fontWeight: 'normal' | 'bold';
+  fontStyle: 'normal' | 'italic';
+  textAlign: 'left' | 'center' | 'right';
+  color: string;
+  rotation: number;
+  modifiedBy: string;
+  lockedBy: string | null;
+  lockedAt: number | null;
+  version: number;
+}>;
 
 // Cursor data structure for multiplayer cursor tracking
 export interface CursorData {
@@ -114,21 +130,11 @@ export const subscribeToObjects = (
           const data = doc.data();
           
           // Convert Firestore timestamps to numbers if needed
+          // Create object based on type, cast as CanvasObject for flexibility
           const object: CanvasObject = {
             id: doc.id,
-            type: data.type,
-            x: data.x,
-            y: data.y,
-            width: data.width,
-            height: data.height,
-            color: data.color,
-            rotation: data.rotation,
-            createdBy: data.createdBy,
-            modifiedBy: data.modifiedBy,
-            lockedBy: data.lockedBy || null,
-            lockedAt: data.lockedAt || null,
-            version: data.version
-          };
+            ...data
+          } as CanvasObject;
           
           objects.push(object);
         });
@@ -175,10 +181,10 @@ export const createObject = async (objectData: CanvasObjectInput): Promise<Canva
     console.log('Object created with ID:', docRef.id);
     
     // Return the object with the generated ID
-    const createdObject: CanvasObject = {
+    const createdObject = {
       ...objectData,
       id: docRef.id
-    };
+    } as CanvasObject;
     
     return createdObject;
   } catch (error) {
@@ -298,7 +304,7 @@ export const createObjectsBatch = async (objects: CanvasObjectInput[]): Promise<
       createdObjects.push({
         ...objectData,
         id: docRef.id
-      });
+      } as CanvasObject);
     }
     
     console.log(`Batch creation completed: ${createdObjects.length} objects created`);
