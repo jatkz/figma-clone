@@ -3,7 +3,6 @@ import ProtectedRoute from './components/ProtectedRoute';
 import LogoutButton from './components/LogoutButton';
 import Canvas from './components/Canvas';
 import ToolPanel, { useToolState } from './components/ToolPanel';
-import FirestoreTest from './components/FirestoreTest';
 import PresenceIndicator from './components/PresenceIndicator';
 import UserList from './components/UserList';
 import { ToastProvider, useToastContext } from './contexts/ToastContext';
@@ -13,7 +12,6 @@ import './App.css';
 
 function AppContent() {
   const { activeTool, setActiveTool } = useToolState('select');
-  const [showFirestoreTest, setShowFirestoreTest] = useState(false);
   const [showUserList, setShowUserList] = useState(false);
   const { toasts, removeToast } = useToastContext();
 
@@ -34,36 +32,20 @@ function AppContent() {
                   </h1>
                   
                   {/* Presence Indicator */}
-                  {!showFirestoreTest && (
-                    <div className="flex-shrink-0 min-w-fit">
-                      <PresenceIndicator />
-                    </div>
-                  )}
+                  <div className="flex-shrink-0 min-w-fit">
+                    <PresenceIndicator />
+                  </div>
 
                   {/* User List Toggle */}
-                  {!showFirestoreTest && (
-                    <button
-                      onClick={() => setShowUserList(!showUserList)}
-                      className={`px-3 py-1 text-sm rounded-lg font-medium transition-colors flex-shrink-0 ${
-                        showUserList 
-                          ? 'bg-blue-600 hover:bg-blue-700 text-white' 
-                          : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
-                      }`}
-                    >
-                      👥 Users
-                    </button>
-                  )}
-
-                  {/* Firestore Test Toggle */}
                   <button
-                    onClick={() => setShowFirestoreTest(!showFirestoreTest)}
+                    onClick={() => setShowUserList(!showUserList)}
                     className={`px-3 py-1 text-sm rounded-lg font-medium transition-colors flex-shrink-0 ${
-                      showFirestoreTest 
-                        ? 'bg-orange-600 hover:bg-orange-700 text-white' 
+                      showUserList 
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white' 
                         : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
                     }`}
                   >
-                    🔥 Test Firestore
+                    👥 Users
                   </button>
                 </div>
                 <div className="flex-shrink-0">
@@ -73,33 +55,24 @@ function AppContent() {
             </div>
           </header>
 
-        {/* Main content area - Canvas and Tool Panel OR Firestore Test */}
+        {/* Main content area - Canvas and Tool Panel */}
         <main className="flex-1 overflow-hidden">
-          {showFirestoreTest ? (
-            /* Firestore Test Interface */
-            <div className="p-4 h-full overflow-y-auto">
-              <FirestoreTest />
+          <div className="flex h-full">
+            {/* Tool Panel */}
+            <div className="p-4 flex-shrink-0">
+              <ToolPanel 
+                activeTool={activeTool}
+                onToolChange={setActiveTool}
+              />
             </div>
-          ) : (
-            /* Normal Canvas Interface */
-            <div className="flex h-full">
-              {/* Tool Panel */}
-              <div className="p-4 flex-shrink-0">
-                <ToolPanel 
-                  activeTool={activeTool}
-                  onToolChange={setActiveTool}
-                />
+            
+            {/* Canvas Area */}
+            <div className="flex-1 p-4 pl-0 pr-0">
+              <div className="bg-white rounded-lg shadow h-full mr-4">
+                <Canvas activeTool={activeTool} />
               </div>
-              
-              {/* Canvas Area */}
-              <div className="flex-1 p-4 pl-0 pr-0">
-                <div className="bg-white rounded-lg shadow h-full mr-4">
-                  <Canvas activeTool={activeTool} />
-                </div>
-              </div>
-
             </div>
-          )}
+          </div>
         </main>
 
         {/* User List Sidebar - Fixed Position (bypasses layout issues) */}
