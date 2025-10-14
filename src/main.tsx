@@ -7,6 +7,7 @@ import Auth0ProviderWithConfig from './config/auth0.tsx'
 // Load dev tools in development mode
 if (import.meta.env.DEV) {
   import('./utils/devTools');
+  import('./utils/aiTest');
 }
 
 createRoot(document.getElementById('root')!).render(
