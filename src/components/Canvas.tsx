@@ -445,17 +445,6 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
 
   return (
     <div className="w-full h-full bg-gray-100 overflow-hidden relative">
-      {/* Connection Status Indicator */}
-      <div className="absolute top-4 left-4 bg-white bg-opacity-90 rounded-lg px-3 py-2 shadow-md z-10">
-        <div className="flex items-center gap-2 text-sm">
-          <div className={`w-2 h-2 rounded-full ${
-            isConnected ? 'bg-green-500' : 'bg-red-500'
-          }`}></div>
-          <span className="text-gray-700">
-            {isConnected ? 'Connected' : 'Disconnected'} • {objects.length} objects
-          </span>
-        </div>
-      </div>
 
 
       <Stage
