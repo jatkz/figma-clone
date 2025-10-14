@@ -362,12 +362,12 @@
 - [x] Update list in real-time from `/canvas/cursors` subcollection
 
 ### 5.5 Lock Status Indicators
-- [ ] Show lock status on rectangles:
+- [x] Show lock status on rectangles:
   - No lock: normal appearance
-  - Locked by you: blue border (2px)
-  - Locked by other: red border (2px) with user's cursor color
-- [ ] Add username label near locked objects
-- [ ] Update indicators in real-time from Firestore
+  - Locked by you: blue border (3px)
+  - Locked by other: border with user's cursor color (3px)
+- [x] Add username label near locked objects
+- [x] Update indicators in real-time from Firestore
 
 ---
 
