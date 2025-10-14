@@ -173,7 +173,7 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
         // Clear pending update
         pendingUpdatesRef.current.delete(objectId);
       }
-    }, 500),
+    }, 100),
     []
   );
 

@@ -95,7 +95,7 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
   // Other users' cursors from Firestore
   const [otherCursors, setOtherCursors] = useState<Map<string, CursorData>>(new Map());
 
-  // Throttled cursor update function (500ms throttle)
+  // Throttled cursor update function (50ms throttle)
   const throttledCursorUpdate = useCallback(
     throttle(async (x: number, y: number) => {
       if (!user?.id || !user?.displayName || !user?.cursorColor) {
@@ -107,7 +107,7 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
       } catch (error) {
         console.warn('Failed to update cursor position:', error);
       }
-    }, 500),
+    }, 50),
     [user?.id, user?.displayName, user?.cursorColor]
   );
 
@@ -287,7 +287,7 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
     const constrainedPosition = constrainToBounds(x, y, object.width, object.height);
 
     // Update object position with optimistic updates and throttled Firestore sync
-    // The useCanvas hook already handles throttling at 500ms
+    // The useCanvas hook already handles throttling at 100ms
     updateObjectOptimistic(objectId, {
       x: constrainedPosition.x,
       y: constrainedPosition.y,
