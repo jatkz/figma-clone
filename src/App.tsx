@@ -5,13 +5,16 @@ import Canvas from './components/Canvas';
 import ToolPanel, { useToolState } from './components/ToolPanel';
 import FirestoreTest from './components/FirestoreTest';
 import PresenceIndicator from './components/PresenceIndicator';
+import UserList from './components/UserList';
 import { ToastProvider, useToastContext } from './contexts/ToastContext';
 import { ToastManager } from './components/Toast';
 import './App.css';
 
+
 function AppContent() {
   const { activeTool, setActiveTool } = useToolState('select');
   const [showFirestoreTest, setShowFirestoreTest] = useState(false);
+  const [showUserList, setShowUserList] = useState(false);
   const { toasts, removeToast } = useToastContext();
 
 
@@ -35,6 +38,20 @@ function AppContent() {
                     <div className="flex-shrink-0 min-w-fit">
                       <PresenceIndicator />
                     </div>
+                  )}
+
+                  {/* User List Toggle */}
+                  {!showFirestoreTest && (
+                    <button
+                      onClick={() => setShowUserList(!showUserList)}
+                      className={`px-3 py-1 text-sm rounded-lg font-medium transition-colors flex-shrink-0 ${
+                        showUserList 
+                          ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                          : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                      }`}
+                    >
+                      👥 Users
+                    </button>
                   )}
 
                   {/* Firestore Test Toggle */}
@@ -75,14 +92,53 @@ function AppContent() {
               </div>
               
               {/* Canvas Area */}
-              <div className="flex-1 p-4 pl-0">
-                <div className="bg-white rounded-lg shadow h-full">
+              <div className="flex-1 p-4 pl-0 pr-0">
+                <div className="bg-white rounded-lg shadow h-full mr-4">
                   <Canvas activeTool={activeTool} />
                 </div>
               </div>
+
             </div>
           )}
         </main>
+
+        {/* User List Sidebar - Fixed Position (bypasses layout issues) */}
+        {showUserList && (
+          <div 
+            className="fixed top-0 right-0 h-full w-80 bg-white shadow-xl border-l border-gray-200 z-50 transform transition-transform duration-300 ease-in-out"
+            style={{ 
+              transform: showUserList ? 'translateX(0)' : 'translateX(100%)',
+              paddingTop: '4rem' // Account for header height
+            }}
+          >
+            <div className="h-full p-4 overflow-y-auto">
+              {/* Close button */}
+              <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900">Online Users</h2>
+                <button
+                  onClick={() => setShowUserList(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+                  aria-label="Close user list"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              {/* User List Content */}
+              <UserList />
+            </div>
+          </div>
+        )}
+
+        {/* Backdrop overlay when sidebar is open */}
+        {showUserList && (
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-25 z-40"
+            onClick={() => setShowUserList(false)}
+          />
+        )}
       </ProtectedRoute>
     </div>
   );

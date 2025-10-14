@@ -354,12 +354,12 @@
   - Query subcollection for stale cursors
 
 ### 5.4 User List Component
-- [ ] Create `src/components/UserList.tsx`
-- [ ] Show all online users with:
+- [x] Create `src/components/UserList.tsx`
+- [x] Show all online users with:
   - Colored dot (their cursor color)
   - Display name (from Auth0, or email prefix fallback)
   - "You" indicator for current user
-- [ ] Update list in real-time from `/canvas/cursors` subcollection
+- [x] Update list in real-time from `/canvas/cursors` subcollection
 
 ### 5.5 Lock Status Indicators
 - [ ] Show lock status on rectangles:
