@@ -19,7 +19,7 @@ Build an AI Canvas Agent that manipulates the collaborative canvas through natur
 - [x] Test basic AI connectivity
 
 ### 7.2 Function Calling Schema
-- [ ] Define AI tool schema in `src/types/aiTools.ts`:
+- [x] Define AI tool schema in `src/types/aiTools.ts`:
   - `createShape(type, x, y, width, height, color)`
   - `moveShape(shapeId, x, y)`
   - `resizeShape(shapeId, width, height)`  
@@ -28,9 +28,10 @@ Build an AI Canvas Agent that manipulates the collaborative canvas through natur
   - `deleteShape(shapeId)`
   - `getCanvasState()`
   - `arrangeShapes(shapeIds, layout)`
-- [ ] Map AI tools to existing canvas service functions
-- [ ] Add input validation and sanitization
-- [ ] Handle coordinate system conversions
+- [x] Map AI tools to existing canvas service functions
+- [x] Add or modify service functions that are missing
+- [x] Add input validation and sanitization
+- [x] Handle coordinate system conversions
 
 ### 7.3 Extended Canvas Objects
 - [ ] Add `Circle` shape type to `types/canvas.ts`

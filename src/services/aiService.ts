@@ -1,4 +1,6 @@
 import OpenAI from 'openai';
+import { AI_TOOLS } from '../types/aiTools';
+import { executeAITool, type AIToolCall } from './aiCanvasService';
 
 /**
  * AI Service for Canvas Agent
@@ -36,6 +38,7 @@ export interface AIResponse {
   success: boolean;
   message?: string;
   functionCalls?: AIFunctionCall[];
+  executionResults?: AIExecutionResult[];
   error?: string;
   metadata?: {
     model: string;
@@ -47,6 +50,13 @@ export interface AIResponse {
 export interface AIFunctionCall {
   name: string;
   arguments: Record<string, any>;
+}
+
+export interface AIExecutionResult {
+  toolCall: AIFunctionCall;
+  result: any;
+  success: boolean;
+  message: string;
 }
 
 export interface ChatMessage {
@@ -104,11 +114,12 @@ const checkRateLimit = (): boolean => {
 };
 
 /**
- * Basic chat completion function
- * Processes natural language input and returns AI response
+ * Process AI command with function calling capabilities
+ * Handles natural language input and executes canvas operations
  */
 export const processAICommand = async (
   message: string,
+  userId: string,
   conversationHistory: ChatMessage[] = []
 ): Promise<AIResponse> => {
   const startTime = Date.now();
@@ -155,19 +166,39 @@ export const processAICommand = async (
     // Prepare system message
     const systemMessage: ChatMessage = {
       role: 'system',
-      content: `You are an AI assistant that helps users manipulate a collaborative canvas through natural language commands. 
-      
-You can help users create, modify, and arrange shapes on a canvas that is shared with other users in real-time.
+      content: `You are an AI assistant that helps users manipulate a collaborative canvas through natural language commands.
 
-Currently supported operations:
-- Creating shapes (rectangles)
-- Moving and resizing objects
-- Changing colors and properties
-- Arranging and aligning objects
+You have access to powerful canvas manipulation tools that allow you to:
 
-Respond in a helpful and conversational manner. If a user asks for something you cannot do yet, explain what you can help with instead.
+🎨 CREATE SHAPES:
+- Create rectangles, circles (coming soon), and text (coming soon)
+- Specify positions, sizes, and colors
+- Use "center" for canvas center, or specific coordinates (0-5000)
 
-For now, just provide conversational responses. Function calling capabilities will be added in the next phase.`,
+🎯 MANIPULATE OBJECTS:
+- Move shapes to new positions
+- Resize shapes to new dimensions  
+- Rotate shapes by degrees
+- Delete unwanted shapes
+
+📐 ARRANGE & ORGANIZE:
+- Arrange shapes in horizontal, vertical, or grid layouts
+- Align shapes (left, right, top, bottom, center)
+- Distribute shapes evenly with custom spacing
+
+🔍 CANVAS ANALYSIS:
+- Get current canvas state and object information
+- Find shapes by description (e.g., "the blue rectangle", "red circle")
+
+When users give you commands like:
+- "Create a blue rectangle in the center"
+- "Move the red shape to the top left"  
+- "Arrange these shapes in a row"
+- "Make a 3x3 grid of squares"
+
+Use the available tools to execute these operations. Always describe what you're doing and confirm the results.
+
+Be helpful, creative, and proactive in suggesting layouts or improvements when appropriate.`,
     };
 
     // Prepare messages
@@ -177,7 +208,7 @@ For now, just provide conversational responses. Function calling capabilities wi
       { role: 'user', content: message },
     ];
 
-    // Make API call
+    // Make API call with function calling
     const response = await client.chat.completions.create({
       model: AI_CONFIG.model,
       messages: messages.map(msg => ({
@@ -186,13 +217,92 @@ For now, just provide conversational responses. Function calling capabilities wi
       })),
       max_tokens: AI_CONFIG.maxTokens,
       temperature: AI_CONFIG.temperature,
-      // Note: Function calling will be added in Phase 7.2
+      tools: AI_TOOLS.map(tool => ({
+        type: 'function' as const,
+        function: {
+          name: tool.name,
+          description: tool.description,
+          parameters: tool.parameters,
+        },
+      })),
+      tool_choice: 'auto', // Let AI decide when to use tools
     });
 
     const responseTime = Date.now() - startTime;
-    const aiMessage = response.choices[0]?.message?.content;
+    const choice = response.choices[0];
+    const aiMessage = choice?.message?.content;
+    const toolCalls = choice?.message?.tool_calls;
 
-    if (!aiMessage) {
+    // Handle function calls if present
+    const functionCalls: AIFunctionCall[] = [];
+    const executionResults: AIExecutionResult[] = [];
+
+    if (toolCalls && toolCalls.length > 0) {
+      console.log(`🤖 AI requested ${toolCalls.length} function calls`);
+      
+      for (const toolCall of toolCalls) {
+        if (toolCall.type === 'function') {
+          try {
+            const args = JSON.parse(toolCall.function.arguments);
+            const aiToolCall: AIToolCall = {
+              name: toolCall.function.name,
+              arguments: args,
+            };
+            
+            functionCalls.push(aiToolCall);
+            
+            // Execute the tool
+            const result = await executeAITool(aiToolCall, userId);
+            
+            executionResults.push({
+              toolCall: aiToolCall,
+              result,
+              success: 'success' in result ? result.success : true,
+              message: 'message' in result ? result.message : 'Operation completed',
+            });
+            
+          } catch (error: any) {
+            console.error(`❌ Function call execution failed:`, error);
+            executionResults.push({
+              toolCall: {
+                name: toolCall.function.name,
+                arguments: {},
+              },
+              result: null,
+              success: false,
+              message: `Failed to execute ${toolCall.function.name}: ${error.message}`,
+            });
+          }
+        }
+      }
+    }
+
+    // Generate response message
+    let finalMessage = aiMessage || '';
+    
+    if (executionResults.length > 0) {
+      const successCount = executionResults.filter(r => r.success).length;
+      const failureCount = executionResults.length - successCount;
+      
+      if (successCount > 0 && failureCount === 0) {
+        // All operations succeeded
+        const operations = executionResults.map(r => r.message).join('\n• ');
+        finalMessage = finalMessage 
+          ? `${finalMessage}\n\n✅ Operations completed:\n• ${operations}`
+          : `✅ Operations completed:\n• ${operations}`;
+      } else if (failureCount > 0) {
+        // Some operations failed
+        const failures = executionResults
+          .filter(r => !r.success)
+          .map(r => r.message)
+          .join('\n• ');
+        finalMessage = finalMessage
+          ? `${finalMessage}\n\n❌ Some operations failed:\n• ${failures}`
+          : `❌ Operations failed:\n• ${failures}`;
+      }
+    }
+
+    if (!finalMessage && !functionCalls.length) {
       return {
         success: false,
         error: 'No response received from AI model.',
@@ -205,7 +315,9 @@ For now, just provide conversational responses. Function calling capabilities wi
 
     return {
       success: true,
-      message: aiMessage,
+      message: finalMessage,
+      functionCalls,
+      executionResults,
       metadata: {
         model: AI_CONFIG.model,
         tokensUsed: response.usage?.total_tokens,
@@ -267,14 +379,15 @@ For now, just provide conversational responses. Function calling capabilities wi
  * Test AI connectivity
  * Simple health check function to verify OpenAI integration
  */
-export const testAIConnectivity = async (): Promise<{
+export const testAIConnectivity = async (userId = 'test-user'): Promise<{
   success: boolean;
   message: string;
   details?: any;
 }> => {
   try {
     const response = await processAICommand(
-      'Hello! Can you confirm that you are working correctly?'
+      'Hello! Can you confirm that you are working correctly?',
+      userId
     );
     
     if (response.success) {
