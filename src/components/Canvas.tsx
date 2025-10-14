@@ -233,11 +233,12 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
             if (selectedObjectId) {
               await releaseObjectLock(selectedObjectId);
               setSelectedObjectId(null);
+              // Don't start panning - deselection consumes the click
+            } else {
+              // No selection to clear, so start panning
+              setIsPanning(true);
+              setLastPointerPosition(pos);
             }
-
-            // Start panning
-            setIsPanning(true);
-            setLastPointerPosition(pos);
           } else if (activeTool === 'rectangle') {
             // Create rectangle at click position
             handleCreateRectangle(pos.x, pos.y);
