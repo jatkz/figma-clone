@@ -275,14 +275,14 @@
   - Display username label near locked object
 
 ### 4.4 Selection with Locking
-- [ ] Modify selection handler:
+- [x] Modify selection handler:
   - On rectangle click, attempt to acquire lock
   - If lock acquired, set as selected
   - If locked by another, show toast notification
-- [ ] Create `src/components/Toast.tsx` for notifications
-- [ ] Show toast: "Being edited by [UserName]"
-- [ ] On deselect, release lock
-- [ ] On delete, release lock automatically
+- [x] Create `src/components/Toast.tsx` for notifications
+- [x] Show toast: "Being edited by [UserName]"
+- [x] On deselect, release lock
+- [x] On delete, release lock automatically
 
 ### 4.5 Object Movement
 - [ ] Add drag handlers to Rectangle component

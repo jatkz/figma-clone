@@ -12,6 +12,7 @@ import Rectangle from './Rectangle';
 import { createRectangle, isWithinCanvasBounds } from '../utils/objectFactory';
 import { useAuth } from '../hooks/useAuth';
 import { useCanvas } from '../hooks/useCanvas';
+import { useToastContext, createToastFunction } from '../contexts/ToastContext';
 
 interface ViewportState {
   x: number;
@@ -27,6 +28,15 @@ interface CanvasProps {
 const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
   const stageRef = useRef<Konva.Stage>(null);
   const { user } = useAuth();
+  
+  // Toast notifications from context
+  const toastContext = useToastContext();
+  
+  // Create toast function for the canvas hook
+  const toastFunction = useCallback(
+    createToastFunction(toastContext),
+    [toastContext]
+  );
 
   // Real-time canvas state from Firestore
   const { 
@@ -39,7 +49,7 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
     deleteObjectOptimistic,
     acquireObjectLock,
     releaseObjectLock
-  } = useCanvas(user?.id);
+  } = useCanvas(user?.id, toastFunction);
 
   // Viewport state: centered at canvas center initially
   const [viewport, setViewport] = useState<ViewportState>({
@@ -112,7 +122,7 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
     };
   }, []);
 
-  // Handle rectangle click with locking
+  // Handle rectangle click with locking and enhanced messaging
   const handleRectangleClick = useCallback(async (objectId: string) => {
     if (activeTool === 'select') {
       // If already selected, deselect and release lock
@@ -122,18 +132,29 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
         return;
       }
 
+      // Find the object to get user information for better messaging
+      const targetObject = objects.find(obj => obj.id === objectId);
+      let lockingUserName = 'Unknown User';
+      
+      // Get the locking user's name if object is locked by someone else
+      if (targetObject?.lockedBy && targetObject.lockedBy !== user?.id) {
+        // For now, we'll use a simple mapping. In a real app, this would come from user service
+        lockingUserName = targetObject.lockedBy === user?.id ? user.displayName : 'Another User';
+      }
+
       // Try to acquire lock on the object
-      const lockAcquired = await acquireObjectLock(objectId);
+      const lockAcquired = await acquireObjectLock(objectId, lockingUserName);
       if (lockAcquired) {
         // Release previous selection's lock if any
         if (selectedObjectId) {
           await releaseObjectLock(selectedObjectId);
         }
         setSelectedObjectId(objectId);
+        toastFunction('Object selected for editing', 'success', 1500);
       }
       // If lock not acquired, selectedObjectId stays the same (don't select)
     }
-  }, [activeTool, selectedObjectId, acquireObjectLock, releaseObjectLock]);
+  }, [activeTool, selectedObjectId, acquireObjectLock, releaseObjectLock, objects, user?.id, user?.displayName, toastFunction]);
 
   // Convert screen coordinates to canvas coordinates (accounting for zoom/pan)
   const screenToCanvasCoords = useCallback((screenX: number, screenY: number) => {

@@ -4,14 +4,21 @@ import LogoutButton from './components/LogoutButton';
 import Canvas from './components/Canvas';
 import ToolPanel, { useToolState } from './components/ToolPanel';
 import FirestoreTest from './components/FirestoreTest';
+import { ToastProvider, useToastContext } from './contexts/ToastContext';
+import { ToastManager } from './components/Toast';
 import './App.css';
 
-function App() {
+function AppContent() {
   const { activeTool, setActiveTool } = useToolState('select');
   const [showFirestoreTest, setShowFirestoreTest] = useState(false);
+  const { toasts, removeToast } = useToastContext();
+
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Toast Manager - Rendered at App level with Portal */}
+      <ToastManager toasts={toasts} onClose={removeToast} />
+      
       <ProtectedRoute>
         {/* Header with logout */}
         <header className="bg-white shadow-sm border-b border-gray-200">
@@ -21,6 +28,7 @@ function App() {
                 <h1 className="text-2xl font-bold text-gray-900">
                   CollabCanvas
                 </h1>
+                
                 
                 {/* Firestore Test Toggle */}
                 <button
@@ -38,7 +46,6 @@ function App() {
             </div>
           </div>
         </header>
-
 
         {/* Main content area - Canvas and Tool Panel OR Firestore Test */}
         <main className="flex-1 overflow-hidden">
@@ -72,5 +79,12 @@ function App() {
   );
 }
 
+function App() {
+  return (
+    <ToastProvider>
+      <AppContent />
+    </ToastProvider>
+  );
+}
 
 export default App;

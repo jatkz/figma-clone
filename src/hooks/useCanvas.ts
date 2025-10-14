@@ -25,17 +25,20 @@ interface UseCanvasActions {
   updateObjectOptimistic: (objectId: string, updates: CanvasObjectUpdate) => Promise<CanvasObject | null>;
   deleteObjectOptimistic: (objectId: string) => Promise<boolean>;
   initializeCanvasIfNeeded: () => Promise<void>;
-  acquireObjectLock: (objectId: string) => Promise<boolean>;
+  acquireObjectLock: (objectId: string, lockingUserName?: string) => Promise<boolean>;
   releaseObjectLock: (objectId: string) => Promise<boolean>;
 }
 
 interface UseCanvasReturn extends UseCanvasState, UseCanvasActions {}
 
-// Toast notification type (simple for now)
-type ToastType = 'success' | 'error' | 'info';
-const showToast = (message: string, type: ToastType = 'info') => {
+// Toast notification interface
+interface ToastFunction {
+  (message: string, type?: 'success' | 'error' | 'info' | 'warning', duration?: number): void;
+}
+
+// Default toast implementation (console-based fallback)
+const defaultToast: ToastFunction = (message: string, type: string = 'info') => {
   console.log(`[${type.toUpperCase()}] ${message}`);
-  // TODO: Replace with actual toast notification system
 };
 
 // Throttle utility for batching updates
@@ -62,7 +65,7 @@ const throttle = <T extends (...args: any[]) => void>(func: T, delay: number): T
  * Custom hook for managing canvas state with real-time Firestore synchronization
  * Handles optimistic updates, error recovery, throttled Firestore operations, and object locking
  */
-export const useCanvas = (userId?: string): UseCanvasReturn => {
+export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast): UseCanvasReturn => {
   // State management
   const [objects, setObjects] = useState<CanvasObject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -107,7 +110,7 @@ export const useCanvas = (userId?: string): UseCanvasReturn => {
         console.error('Failed to setup canvas:', err);
         setError(err instanceof Error ? err.message : 'Failed to connect to canvas');
         setIsConnected(false);
-        showToast('Failed to connect to canvas', 'error');
+        toast('Failed to connect to canvas', 'error');
       } finally {
         if (mounted) {
           setIsLoading(false);
@@ -165,7 +168,7 @@ export const useCanvas = (userId?: string): UseCanvasReturn => {
         
         // Rollback to last known good state
         setObjects([...lastKnownGoodStateRef.current]);
-        showToast('Update failed, changes reverted', 'error');
+        toast('Update failed, changes reverted', 'error');
         
         // Clear pending update
         pendingUpdatesRef.current.delete(objectId);
@@ -203,7 +206,6 @@ export const useCanvas = (userId?: string): UseCanvasReturn => {
       );
 
       console.log('✅ Object creation completed successfully');
-      showToast('Object created successfully', 'success');
       return createdObject;
 
     } catch (error) {
@@ -211,7 +213,7 @@ export const useCanvas = (userId?: string): UseCanvasReturn => {
       
       // Rollback: remove the optimistic object
       setObjects(prev => prev.filter(obj => !obj.id.startsWith('temp-')));
-      showToast('Failed to create object', 'error');
+      toast('Failed to create object', 'error');
       
       return null;
     }
@@ -252,7 +254,7 @@ export const useCanvas = (userId?: string): UseCanvasReturn => {
 
     } catch (error) {
       console.error('❌ Object update failed:', error);
-      showToast('Update failed', 'error');
+      toast('Update failed', 'error');
       return null;
     }
   }, [objects, throttledFirestoreUpdate]);
@@ -276,7 +278,6 @@ export const useCanvas = (userId?: string): UseCanvasReturn => {
       await deleteObject(objectId);
 
       console.log('✅ Object deletion completed successfully');
-      showToast('Object deleted successfully', 'success');
       return true;
 
     } catch (error) {
@@ -284,7 +285,7 @@ export const useCanvas = (userId?: string): UseCanvasReturn => {
       
       // Rollback: restore the deleted object
       setObjects(prev => [...prev, objects.find(obj => obj.id === objectId)!]);
-      showToast('Failed to delete object', 'error');
+      toast('Failed to delete object', 'error');
       
       return false;
     }
@@ -294,16 +295,16 @@ export const useCanvas = (userId?: string): UseCanvasReturn => {
   const initializeCanvasIfNeeded = useCallback(async (): Promise<void> => {
     try {
       await initializeCanvas();
-      showToast('Canvas initialized successfully', 'success');
+      toast('Canvas initialized successfully', 'success');
     } catch (error) {
       console.error('Failed to initialize canvas:', error);
-      showToast('Failed to initialize canvas', 'error');
+      toast('Failed to initialize canvas', 'error');
       throw error;
     }
-  }, []);
+  }, [toast]);
 
-  // Acquire lock on an object
-  const acquireObjectLock = useCallback(async (objectId: string): Promise<boolean> => {
+  // Acquire lock on an object with enhanced user messaging
+  const acquireObjectLock = useCallback(async (objectId: string, lockingUserName?: string): Promise<boolean> => {
     if (!userId) {
       console.warn('Cannot acquire lock: user ID not provided');
       return false;
@@ -311,18 +312,22 @@ export const useCanvas = (userId?: string): UseCanvasReturn => {
 
     try {
       const success = await acquireLock(objectId, userId);
-      if (success) {
-        showToast('Object locked for editing', 'success');
-      } else {
-        showToast('Object is being edited by another user', 'error');
+      if (!success) {
+        // Find the object to get the locking user info
+        const object = objects.find(obj => obj.id === objectId);
+        if (object?.lockedBy && lockingUserName) {
+          toast(`Being edited by ${lockingUserName}`, 'warning', 3000);
+        } else {
+          toast('Object is being edited by another user', 'warning', 3000);
+        }
       }
       return success;
     } catch (error) {
       console.error('Failed to acquire lock:', error);
-      showToast('Failed to lock object', 'error');
+      toast('Failed to lock object', 'error');
       return false;
     }
-  }, [userId]);
+  }, [userId, objects, toast]);
 
   // Release lock on an object
   const releaseObjectLock = useCallback(async (objectId: string): Promise<boolean> => {
