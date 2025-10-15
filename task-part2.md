@@ -48,29 +48,29 @@ Build an AI Canvas Agent that manipulates the collaborative canvas through natur
 ## Phase 8: Core AI Commands (Hours 33-40)
 
 ### 8.1 Creation Commands
-- [ ] Implement shape creation via AI:
+- [x] Implement shape creation via AI:
   - "Create a red circle at position 100, 200"
   - "Add a blue rectangle in the center"
   - "Make a 200x300 green rectangle"
-- [ ] Implement text creation via AI:
+- [x] Implement text creation via AI:
   - "Add text that says 'Hello World'"
   - "Create a title that says 'Welcome'"
-- [ ] Handle coordinate parsing and validation
-- [ ] Add default size/color fallbacks
-- [ ] Test creation command accuracy
+- [x] Handle coordinate parsing and validation
+- [x] Add default size/color fallbacks
+- [x] Test creation command accuracy
 
 ### 8.2 Manipulation Commands  
-- [ ] Implement object selection by description:
+- [x] Implement object selection by description:
   - "Move the blue rectangle to the center"
   - "Select the red circle"
-- [ ] Implement resize operations:
+- [x] Implement resize operations:
   - "Make the circle twice as big"
   - "Resize the rectangle to 300x200"
-- [ ] Implement rotation operations:
+- [x] Implement rotation operations:
   - "Rotate the text 45 degrees"
   - "Turn the rectangle 90 degrees"
-- [ ] Add object finding algorithms (by color, type, position)
-- [ ] Handle ambiguous object references
+- [x] Add object finding algorithms (by color, type, position)
+- [x] Handle ambiguous object references
 
 ### 8.3 Layout Commands
 - [ ] Implement arrangement algorithms:

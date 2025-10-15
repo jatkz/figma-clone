@@ -88,6 +88,7 @@ export const cleanupAICanvasState = () => {
 
 /**
  * Find shapes by ID or description
+ * Supports color, type, position, and superlative queries
  */
 export const findShapesByDescription = (description: string): CanvasObject[] => {
   const desc = description.toLowerCase().trim();
@@ -98,39 +99,78 @@ export const findShapesByDescription = (description: string): CanvasObject[] => 
     if (exactMatch) return [exactMatch];
   }
   
-  const matches: CanvasObject[] = [];
+  let matches: CanvasObject[] = [];
   
+  // First pass: find by color, type, and position
   for (const obj of currentCanvasObjects) {
     const objColor = obj.color.toLowerCase();
     const objType = obj.type.toLowerCase();
     
-    // Check for color + type matches (e.g., "blue rectangle")
+    let isMatch = false;
+    
+    // Check for color + type matches (e.g., "blue rectangle") - highest priority
     if (desc.includes(objColor) && desc.includes(objType)) {
       matches.push(obj);
+      isMatch = true;
       continue;
     }
     
     // Check for type matches (e.g., "rectangle", "the circle")
     if (desc.includes(objType) || desc.includes(`the ${objType}`)) {
       matches.push(obj);
-      continue;
+      isMatch = true;
     }
     
     // Check for color matches (e.g., "blue", "the red one")
-    if (desc.includes(objColor)) {
+    if (!isMatch && desc.includes(objColor)) {
       matches.push(obj);
-      continue;
+      isMatch = true;
     }
     
     // Check for position-based descriptions (e.g., "top", "left")
-    if (desc.includes('top') && obj.y < CANVAS_BOUNDS.CENTER_Y) {
-      matches.push(obj);
-    } else if (desc.includes('bottom') && obj.y > CANVAS_BOUNDS.CENTER_Y) {
-      matches.push(obj);
-    } else if (desc.includes('left') && obj.x < CANVAS_BOUNDS.CENTER_X) {
-      matches.push(obj);
-    } else if (desc.includes('right') && obj.x > CANVAS_BOUNDS.CENTER_X) {
-      matches.push(obj);
+    if (!isMatch) {
+      if (desc.includes('top') && obj.y < CANVAS_BOUNDS.CENTER_Y) {
+        matches.push(obj);
+      } else if (desc.includes('bottom') && obj.y > CANVAS_BOUNDS.CENTER_Y) {
+        matches.push(obj);
+      } else if (desc.includes('left') && obj.x < CANVAS_BOUNDS.CENTER_X) {
+        matches.push(obj);
+      } else if (desc.includes('right') && obj.x > CANVAS_BOUNDS.CENTER_X) {
+        matches.push(obj);
+      }
+    }
+  }
+  
+  // Second pass: apply superlatives if present
+  if (matches.length > 1) {
+    if (desc.includes('largest') || desc.includes('biggest')) {
+      // Find the largest by area
+      matches = [matches.reduce((largest, obj) => {
+        const largestDim = getShapeDimensions(largest);
+        const objDim = getShapeDimensions(obj);
+        const largestArea = largestDim.width * largestDim.height;
+        const objArea = objDim.width * objDim.height;
+        return objArea > largestArea ? obj : largest;
+      })];
+    } else if (desc.includes('smallest') || desc.includes('tiniest')) {
+      // Find the smallest by area
+      matches = [matches.reduce((smallest, obj) => {
+        const smallestDim = getShapeDimensions(smallest);
+        const objDim = getShapeDimensions(obj);
+        const smallestArea = smallestDim.width * smallestDim.height;
+        const objArea = objDim.width * objDim.height;
+        return objArea < smallestArea ? obj : smallest;
+      })];
+    } else if (desc.includes('first') || desc.includes('leftmost')) {
+      // Find leftmost
+      matches = [matches.reduce((leftmost, obj) => 
+        obj.x < leftmost.x ? obj : leftmost
+      )];
+    } else if (desc.includes('last') || desc.includes('rightmost')) {
+      // Find rightmost
+      matches = [matches.reduce((rightmost, obj) => 
+        obj.x > rightmost.x ? obj : rightmost
+      )];
     }
   }
   
@@ -139,10 +179,23 @@ export const findShapesByDescription = (description: string): CanvasObject[] => 
 
 /**
  * Find a single shape by description (returns the first match)
+ * Logs a warning if multiple matches are found
  */
 export const findSingleShape = (description: string): CanvasObject | null => {
   const matches = findShapesByDescription(description);
-  return matches.length > 0 ? matches[0] : null;
+  
+  if (matches.length === 0) {
+    return null;
+  }
+  
+  if (matches.length > 1) {
+    console.warn(
+      `⚠️ Ambiguous reference: "${description}" matches ${matches.length} objects. Using first match.`,
+      matches.map(obj => ({ id: obj.id, type: obj.type, color: obj.color, position: `(${obj.x}, ${obj.y})` }))
+    );
+  }
+  
+  return matches[0];
 };
 
 // ============================================================================
@@ -278,9 +331,14 @@ export const aiMoveShape = async (
     const shape = findSingleShape(params.shapeId);
     
     if (!shape) {
+      // Provide helpful error with available shapes
+      const availableShapes = currentCanvasObjects.map(obj => 
+        `${obj.color} ${obj.type}`
+      ).join(', ');
+      
       return {
         success: false,
-        message: `Could not find shape: ${params.shapeId}`,
+        message: `Could not find shape matching "${params.shapeId}". Available shapes: ${availableShapes || 'none'}`,
         error: 'Shape not found'
       };
     }
@@ -324,9 +382,14 @@ export const aiResizeShape = async (
     const shape = findSingleShape(params.shapeId);
     
     if (!shape) {
+      // Provide helpful error with available shapes
+      const availableShapes = currentCanvasObjects.map(obj => 
+        `${obj.color} ${obj.type}`
+      ).join(', ');
+      
       return {
         success: false,
-        message: `Could not find shape: ${params.shapeId}`,
+        message: `Could not find shape matching "${params.shapeId}". Available shapes: ${availableShapes || 'none'}`,
         error: 'Shape not found'
       };
     }
@@ -417,9 +480,14 @@ export const aiRotateShape = async (
     const shape = findSingleShape(params.shapeId);
     
     if (!shape) {
+      // Provide helpful error with available shapes
+      const availableShapes = currentCanvasObjects.map(obj => 
+        `${obj.color} ${obj.type}`
+      ).join(', ');
+      
       return {
         success: false,
-        message: `Could not find shape: ${params.shapeId}`,
+        message: `Could not find shape matching "${params.shapeId}". Available shapes: ${availableShapes || 'none'}`,
         error: 'Shape not found'
       };
     }
@@ -460,9 +528,14 @@ export const aiDeleteShape = async (
     const shape = findSingleShape(params.shapeId);
     
     if (!shape) {
+      // Provide helpful error with available shapes
+      const availableShapes = currentCanvasObjects.map(obj => 
+        `${obj.color} ${obj.type}`
+      ).join(', ');
+      
       return {
         success: false,
-        message: `Could not find shape: ${params.shapeId}`,
+        message: `Could not find shape matching "${params.shapeId}". Available shapes: ${availableShapes || 'none'}`,
         error: 'Shape not found'
       };
     }

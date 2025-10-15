@@ -93,18 +93,68 @@ Wait 60 seconds. Max 20 requests/minute.
 Check `.env.local` has `VITE_OPENAI_API_KEY=sk-...`
 
 ### "Could not find shape"
-Shape selection commands are in Phase 8.2 (not yet implemented).
+- Create shapes first using Phase 8.1 commands
+- Check error message for list of available shapes
+- Try more specific descriptions ("blue rectangle" vs "rectangle")
+- Use superlatives to disambiguate ("largest blue rectangle")
 
 ### Shapes not visible
 Pan the canvas or check coordinates. Canvas is 5000x5000, viewport may be elsewhere.
 
-## Next Phase Features (Not Yet Available)
+## Command Examples (Phase 8.2 - Manipulation) ✅
 
-Phase 8.2 will add:
-- "Move the blue rectangle to 100, 200"
-- "Resize the circle to 200x200"
-- "Rotate the text 45 degrees"
-- "Delete the red circle"
+### Move Commands
+```javascript
+// Absolute positioning
+"Move the blue rectangle to 1000, 2000"
+"Move the red circle to the center"
+
+// Relative movement (AI calculates)
+"Move the text to the right"
+"Move the shape down a bit"
+```
+
+### Resize Commands
+```javascript
+// Absolute sizing
+"Resize the rectangle to 300x200"
+"Make the circle 400x400"
+
+// Relative sizing (AI calculates)
+"Make the circle twice as big"
+"Make the rectangle 50% larger"
+```
+
+### Rotate Commands
+```javascript
+"Rotate the text 45 degrees"
+"Turn the rectangle 90 degrees"
+"Rotate the shape 180 degrees"
+```
+
+### Delete Commands
+```javascript
+"Delete the red circle"
+"Remove the text"
+"Delete the largest rectangle"
+```
+
+### Advanced Finding
+```javascript
+// By superlatives
+"Move the largest rectangle to the center"
+"Delete the smallest circle"
+"Rotate the leftmost text 45 degrees"
+
+// By position
+"Move the shape on the left to 2000, 2000"
+"Delete the rectangle at the top"
+
+// Color + type (most specific)
+"Resize the blue rectangle to 500x300"
+```
+
+## Next Phase Features (Not Yet Available)
 
 Phase 8.3 will add:
 - "Arrange these shapes in a row"
@@ -113,5 +163,6 @@ Phase 8.3 will add:
 
 ---
 
-**Phase 8.1 Status: ✅ Complete**
+**Phase 8.1 Status: ✅ Complete**  
+**Phase 8.2 Status: ✅ Complete**
 
