@@ -64,6 +64,15 @@ export interface ChatMessage {
   content: string;
 }
 
+export interface ProgressUpdate {
+  stage: 'thinking' | 'executing';
+  current?: number;
+  total?: number;
+  operation?: string;
+}
+
+export type ProgressCallback = (update: ProgressUpdate) => void;
+
 // Initialize OpenAI client
 let openaiClient: OpenAI | null = null;
 
@@ -120,7 +129,8 @@ const checkRateLimit = (): boolean => {
 export const processAICommand = async (
   message: string,
   userId: string,
-  conversationHistory: ChatMessage[] = []
+  conversationHistory: ChatMessage[] = [],
+  onProgress?: ProgressCallback
 ): Promise<AIResponse> => {
   const startTime = Date.now();
   
@@ -208,6 +218,9 @@ Be helpful, creative, and proactive in suggesting layouts or improvements when a
       { role: 'user', content: message },
     ];
 
+    // Report thinking stage
+    onProgress?.({ stage: 'thinking' });
+
     // Make API call with function calling
     const response = await client.chat.completions.create({
       model: AI_CONFIG.model,
@@ -240,8 +253,18 @@ Be helpful, creative, and proactive in suggesting layouts or improvements when a
     if (toolCalls && toolCalls.length > 0) {
       console.log(`🤖 AI requested ${toolCalls.length} function calls`);
       
-      for (const toolCall of toolCalls) {
+      for (let i = 0; i < toolCalls.length; i++) {
+        const toolCall = toolCalls[i];
+        
         if (toolCall.type === 'function') {
+          // Report execution progress
+          onProgress?.({
+            stage: 'executing',
+            current: i + 1,
+            total: toolCalls.length,
+            operation: toolCall.function.name,
+          });
+          
           try {
             const args = JSON.parse(toolCall.function.arguments);
             const aiToolCall: AIToolCall = {
@@ -277,7 +300,7 @@ Be helpful, creative, and proactive in suggesting layouts or improvements when a
       }
     }
 
-    // Generate response message
+    // Generate response message with detailed feedback
     let finalMessage = aiMessage || '';
     
     if (executionResults.length > 0) {
@@ -287,18 +310,40 @@ Be helpful, creative, and proactive in suggesting layouts or improvements when a
       if (successCount > 0 && failureCount === 0) {
         // All operations succeeded
         const operations = executionResults.map(r => r.message).join('\n• ');
+        const summary = executionResults.length === 1 
+          ? '✅ Operation completed successfully'
+          : `✅ All ${executionResults.length} operations completed successfully`;
+        
         finalMessage = finalMessage 
-          ? `${finalMessage}\n\n✅ Operations completed:\n• ${operations}`
-          : `✅ Operations completed:\n• ${operations}`;
-      } else if (failureCount > 0) {
-        // Some operations failed
+          ? `${finalMessage}\n\n${summary}:\n• ${operations}`
+          : `${summary}:\n• ${operations}`;
+      } else if (failureCount > 0 && successCount > 0) {
+        // Partial success - some operations succeeded, some failed
+        const successes = executionResults
+          .filter(r => r.success)
+          .map(r => r.message)
+          .join('\n• ');
         const failures = executionResults
           .filter(r => !r.success)
           .map(r => r.message)
           .join('\n• ');
+        
         finalMessage = finalMessage
-          ? `${finalMessage}\n\n❌ Some operations failed:\n• ${failures}`
-          : `❌ Operations failed:\n• ${failures}`;
+          ? `${finalMessage}\n\n⚠️ Partial success (${successCount}/${executionResults.length} operations completed):\n\n✅ Succeeded:\n• ${successes}\n\n❌ Failed:\n• ${failures}`
+          : `⚠️ Partial success (${successCount}/${executionResults.length} operations completed):\n\n✅ Succeeded:\n• ${successes}\n\n❌ Failed:\n• ${failures}`;
+      } else {
+        // All operations failed
+        const failures = executionResults
+          .filter(r => !r.success)
+          .map(r => r.message)
+          .join('\n• ');
+        const summary = executionResults.length === 1
+          ? '❌ Operation failed'
+          : `❌ All ${executionResults.length} operations failed`;
+        
+        finalMessage = finalMessage
+          ? `${finalMessage}\n\n${summary}:\n• ${failures}`
+          : `${summary}:\n• ${failures}`;
       }
     }
 

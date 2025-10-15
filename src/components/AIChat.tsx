@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { processAICommand } from '../services/aiService';
-import type { ChatMessage } from '../services/aiService';
+import type { ChatMessage, ProgressUpdate } from '../services/aiService';
 
 interface AIChatProps {
   className?: string;
@@ -24,6 +24,7 @@ const AIChat: React.FC<AIChatProps> = ({ className = '' }) => {
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [progressState, setProgressState] = useState<ProgressUpdate | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const isProcessingRef = useRef(false); // Prevent concurrent requests
@@ -85,19 +86,25 @@ const AIChat: React.FC<AIChatProps> = ({ className = '' }) => {
     setInputValue('');
     setIsLoading(true);
     setIsTyping(true);
+    setProgressState(null);
 
     try {
-      // Call AI service
+      // Call AI service with progress callback
       const response = await processAICommand(
         userMessage.content,
         user.id,
         messages.map((msg) => ({
           role: msg.role,
           content: msg.content,
-        })) as ChatMessage[]
+        })) as ChatMessage[],
+        (update: ProgressUpdate) => {
+          // Update progress state in real-time
+          setProgressState(update);
+        }
       );
 
       setIsTyping(false);
+      setProgressState(null);
 
       // Add AI response
       const aiMessage: Message = {
@@ -111,6 +118,7 @@ const AIChat: React.FC<AIChatProps> = ({ className = '' }) => {
       setMessages((prev) => [...prev, aiMessage]);
     } catch (error: any) {
       setIsTyping(false);
+      setProgressState(null);
       
       // Add error message
       const errorMessage: Message = {
@@ -124,6 +132,7 @@ const AIChat: React.FC<AIChatProps> = ({ className = '' }) => {
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+      setProgressState(null);
       isProcessingRef.current = false; // Allow new requests
     }
   };
@@ -208,14 +217,32 @@ const AIChat: React.FC<AIChatProps> = ({ className = '' }) => {
           ))
         )}
 
-        {/* Typing indicator */}
+        {/* Progress indicator - shows thinking, executing, and multi-step progress */}
         {isTyping && (
           <div className="flex justify-start">
             <div className="bg-gray-100 rounded-lg px-4 py-3">
-              <div className="flex space-x-2">
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              <div className="flex items-center space-x-3">
+                {/* Animated dots */}
+                <div className="flex space-x-2">
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+                
+                {/* Progress text */}
+                <div className="text-sm text-gray-600">
+                  {!progressState && <span>Processing...</span>}
+                  {progressState?.stage === 'thinking' && <span>🤔 Thinking...</span>}
+                  {progressState?.stage === 'executing' && !progressState.total && (
+                    <span>⚡ Executing...</span>
+                  )}
+                  {progressState?.stage === 'executing' && progressState.total && progressState.current && (
+                    <span>
+                      ⚡ Executing operation {progressState.current} of {progressState.total}
+                      {progressState.operation && <span className="text-xs text-gray-500 ml-1">({progressState.operation})</span>}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </div>

@@ -108,12 +108,12 @@ Build an AI Canvas Agent that manipulates the collaborative canvas through natur
 - [x] Implement message timestamps
 
 ### 9.3 AI Response Processing
-- [ ] Parse AI function calls from responses
-- [ ] Execute canvas operations sequentially
-- [ ] Provide feedback on operation success/failure
-- [ ] Handle partial failures in multi-step operations
-- [ ] Add operation progress indicators
-- [ ] Show AI "thinking" and "executing" states
+- [x] Parse AI function calls from responses
+- [x] Execute canvas operations sequentially
+- [x] Provide feedback on operation success/failure
+- [x] Handle partial failures in multi-step operations
+- [x] Add operation progress indicators
+- [x] Show AI "thinking" and "executing" states
 
 ---
 
