@@ -29,6 +29,29 @@ import {
 import { getShapeDimensions } from '../utils/shapeUtils';
 
 // ============================================================================
+// Utility Functions
+// ============================================================================
+
+/**
+ * Generate a random color for shapes
+ */
+const generateRandomColor = (): string => {
+  const colors = [
+    '#FF6B6B', // Red
+    '#4ECDC4', // Teal
+    '#45B7D1', // Blue
+    '#FFA07A', // Orange
+    '#98D8C8', // Mint
+    '#F7DC6F', // Yellow
+    '#BB8FCE', // Purple
+    '#85C1E2', // Light Blue
+    '#F8B739', // Gold
+    '#52C78C', // Green
+  ];
+  return colors[Math.floor(Math.random() * colors.length)];
+};
+
+// ============================================================================
 // Canvas State Management
 // ============================================================================
 
@@ -138,9 +161,12 @@ export const aiCreateShape = async (
     const coords = resolveCoordinates(params.x, params.y);
     
     // Set defaults based on shape type
-    let width = params.width || 100;
-    let height = params.height || 100;
-    let color = parseColor(params.color || '#0066cc');
+    // Enforce min 50, max 1000 for dimensions
+    let width = params.width ? Math.max(50, Math.min(1000, params.width)) : 100;
+    let height = params.height ? Math.max(50, Math.min(1000, params.height)) : 100;
+    
+    // Default color: random for shapes, will be overridden for text
+    let color = params.color ? parseColor(params.color) : generateRandomColor();
     
     // Validate coordinates
     const validCoords = validateCoordinates(coords.x, coords.y, width, height);
@@ -191,6 +217,9 @@ export const aiCreateShape = async (
         const textWidth = text.length * fontSize * 0.6;
         const textHeight = fontSize * 1.2;
         
+        // Text always defaults to black unless explicitly specified
+        const textColor = params.color ? parseColor(params.color) : '#000000';
+        
         objectData = {
           type: 'text',
           x: validCoords.x,
@@ -203,7 +232,7 @@ export const aiCreateShape = async (
           textAlign: 'left',
           width: textWidth,
           height: textHeight,
-          color,
+          color: textColor,
           rotation: 0,
           createdBy: userId,
           modifiedBy: userId,
@@ -308,8 +337,8 @@ export const aiResizeShape = async (
     };
     
     if (shape.type === 'rectangle') {
-      const width = Math.max(10, Math.min(1000, params.width));
-      const height = Math.max(10, Math.min(1000, params.height));
+      const width = Math.max(50, Math.min(1000, params.width));
+      const height = Math.max(50, Math.min(1000, params.height));
       
       // Ensure shape stays within canvas bounds after resize
       const validCoords = validateCoordinates(shape.x, shape.y, width, height);
@@ -322,7 +351,7 @@ export const aiResizeShape = async (
         modifiedBy: userId
       };
     } else if (shape.type === 'circle') {
-      const radius = Math.max(5, Math.min(500, Math.max(params.width, params.height) / 2));
+      const radius = Math.max(25, Math.min(500, Math.max(params.width, params.height) / 2));
       
       // Ensure circle stays within canvas bounds after resize
       const validCoords = validateCoordinates(shape.x, shape.y, radius * 2, radius * 2);
@@ -336,7 +365,7 @@ export const aiResizeShape = async (
     } else if (shape.type === 'text') {
       // For text, width and height affect the text box size
       const width = Math.max(50, Math.min(1000, params.width));
-      const height = Math.max(20, Math.min(500, params.height));
+      const height = Math.max(50, Math.min(500, params.height));
       
       // Ensure text stays within canvas bounds after resize
       const validCoords = validateCoordinates(shape.x, shape.y, width, height);

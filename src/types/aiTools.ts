@@ -35,7 +35,7 @@ export interface AIToolParameter {
 export const AI_TOOLS: AITool[] = [
   {
     name: 'createShape',
-    description: 'Create a new shape on the canvas',
+    description: 'Create a new shape on the canvas. Examples: "Create a red rectangle", "Make a blue circle at 100, 200", "Add text that says Hello"',
     parameters: {
       type: 'object',
       properties: {
@@ -46,23 +46,23 @@ export const AI_TOOLS: AITool[] = [
         },
         x: {
           type: 'number',
-          description: 'X coordinate (0-5000, or use "center" for canvas center)'
+          description: 'X coordinate (0-5000). Canvas center is at 2500. Use 2500 for center positioning.'
         },
         y: {
           type: 'number', 
-          description: 'Y coordinate (0-5000, or use "center" for canvas center)'
+          description: 'Y coordinate (0-5000). Canvas center is at 2500. Use 2500 for center positioning.'
         },
         width: {
           type: 'number',
-          description: 'Width of the shape in pixels (default: 100 for shapes)'
+          description: 'Width of the shape in pixels (min: 50, max: 1000, default: 100)'
         },
         height: {
           type: 'number',
-          description: 'Height of the shape in pixels (default: 100 for shapes)'
+          description: 'Height of the shape in pixels (min: 50, max: 1000, default: 100)'
         },
         color: {
           type: 'string',
-          description: 'Color of the shape (hex code, color name, or CSS color)'
+          description: 'Color of the shape (hex code or color name like "red", "blue"). Defaults to random for shapes, black for text.'
         },
         text: {
           type: 'string',
@@ -78,7 +78,7 @@ export const AI_TOOLS: AITool[] = [
   },
   {
     name: 'moveShape',
-    description: 'Move an existing shape to a new position',
+    description: 'Move an existing shape to a new position. Examples: "Move the blue rectangle to 100, 200", "Move the text to the center"',
     parameters: {
       type: 'object',
       properties: {
@@ -88,11 +88,11 @@ export const AI_TOOLS: AITool[] = [
         },
         x: {
           type: 'number',
-          description: 'New X coordinate (0-5000)'
+          description: 'New X coordinate (0-5000). Canvas center is at 2500.'
         },
         y: {
           type: 'number',
-          description: 'New Y coordinate (0-5000)'
+          description: 'New Y coordinate (0-5000). Canvas center is at 2500.'
         }
       },
       required: ['shapeId', 'x', 'y']
@@ -100,7 +100,7 @@ export const AI_TOOLS: AITool[] = [
   },
   {
     name: 'resizeShape',
-    description: 'Resize an existing shape',
+    description: 'Resize an existing shape. Examples: "Make the circle twice as big", "Resize the rectangle to 300x200"',
     parameters: {
       type: 'object',
       properties: {
@@ -110,11 +110,11 @@ export const AI_TOOLS: AITool[] = [
         },
         width: {
           type: 'number',
-          description: 'New width in pixels'
+          description: 'New width in pixels (min: 50, max: 1000)'
         },
         height: {
           type: 'number',
-          description: 'New height in pixels'
+          description: 'New height in pixels (min: 50, max: 1000)'
         }
       },
       required: ['shapeId', 'width', 'height']
@@ -122,7 +122,7 @@ export const AI_TOOLS: AITool[] = [
   },
   {
     name: 'rotateShape',
-    description: 'Rotate an existing shape',
+    description: 'Rotate an existing shape. Examples: "Rotate the text 45 degrees", "Turn the rectangle 90 degrees"',
     parameters: {
       type: 'object',
       properties: {
@@ -140,7 +140,7 @@ export const AI_TOOLS: AITool[] = [
   },
   {
     name: 'deleteShape',
-    description: 'Delete a shape from the canvas',
+    description: 'Delete a shape from the canvas. Examples: "Delete the red circle", "Remove the text"',
     parameters: {
       type: 'object',
       properties: {
@@ -163,13 +163,13 @@ export const AI_TOOLS: AITool[] = [
   },
   {
     name: 'arrangeShapes',
-    description: 'Arrange multiple shapes in a specific layout',
+    description: 'Arrange multiple shapes in a specific layout. Examples: "Arrange these shapes in a horizontal row", "Create a vertical stack", "Make a 3x3 grid"',
     parameters: {
       type: 'object',
       properties: {
         shapeIds: {
           type: 'array',
-          description: 'Array of shape IDs or descriptions to arrange',
+          description: 'Array of shape IDs or descriptions to arrange (e.g., ["red rectangle", "blue circle"])',
           items: {
             type: 'string'
           }

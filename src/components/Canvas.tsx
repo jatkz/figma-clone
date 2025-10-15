@@ -18,6 +18,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useCanvas } from '../hooks/useCanvas';
 import { useToastContext, createToastFunction } from '../contexts/ToastContext';
 import { updateCursor, subscribeToCursors, type CursorData } from '../services/canvasService';
+import { initializeAICanvasState, cleanupAICanvasState } from '../services/aiCanvasService';
 import Cursor from './Cursor';
 
 // Throttle utility for cursor updates
@@ -185,6 +186,17 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
       cursorsUnsubscribe();
     };
   }, [user?.id]);
+
+  // Initialize AI Canvas state tracking for AI operations
+  useEffect(() => {
+    console.log('🤖 Initializing AI Canvas state tracking');
+    initializeAICanvasState();
+    
+    return () => {
+      console.log('🤖 Cleaning up AI Canvas state tracking');
+      cleanupAICanvasState();
+    };
+  }, []);
 
   // Constrain viewport to boundaries
   const constrainViewport = useCallback((newViewport: ViewportState): ViewportState => {
