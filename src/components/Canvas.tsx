@@ -231,13 +231,18 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
 
   // Handle rectangle click with locking and enhanced messaging
   const handleRectangleClick = useCallback(async (objectId: string) => {
+    console.log('🖱️ handleRectangleClick called:', { objectId, selectedObjectId, activeTool });
+    
     if (activeTool === 'select') {
       // If already selected, deselect and release lock
       if (selectedObjectId === objectId) {
+        console.log('✅ Deselecting object:', objectId);
         await releaseObjectLock(objectId);
         setSelectedObjectId(null);
         return;
       }
+      
+      console.log('📌 Attempting to select new object:', objectId);
 
       // Find the object to get user information for better messaging
       const targetObject = objects.find(obj => obj.id === objectId);
@@ -596,7 +601,13 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
             const sharedProps = {
               isSelected: selectedObjectId === object.id,
               onSelect: handleRectangleClick,
-              onDeselect: () => handleRectangleClick(''),
+              onDeselect: async () => {
+                if (selectedObjectId) {
+                  console.log('✅ Deselecting via onDeselect:', selectedObjectId);
+                  await releaseObjectLock(selectedObjectId);
+                  setSelectedObjectId(null);
+                }
+              },
               onDragStart: handleRectangleDragStart,
               onDragMove: handleRectangleDragMove,
               onDragEnd: handleRectangleDragEnd,
