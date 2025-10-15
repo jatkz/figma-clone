@@ -154,15 +154,70 @@ Pan the canvas or check coordinates. Canvas is 5000x5000, viewport may be elsewh
 "Resize the blue rectangle to 500x300"
 ```
 
+## Command Examples (Phase 8.3 - Layout) ✅
+
+### Arrangement
+```javascript
+// Horizontal row
+"Arrange these shapes in a horizontal row: red rectangle, blue rectangle"
+
+// Vertical stack
+"Create a vertical stack with the circles"
+
+// Grid (existing shapes)
+"Arrange all rectangles in a grid"
+```
+
+### Alignment
+```javascript
+// Left align
+"Align these shapes to the left"
+
+// Right align
+"Align these to the right"
+
+// Top/Bottom align
+"Align to the top"
+"Align to the bottom"
+
+// Center
+"Center these objects"
+```
+
+### Distribution
+```javascript
+// Horizontal distribution
+"Distribute these shapes evenly horizontally"
+
+// Vertical distribution
+"Space these evenly vertically"
+```
+
+### Grid Creation (NEW!)
+```javascript
+// Basic grid
+"Create a 3x3 grid of squares"
+
+// Colored grid
+"Make a 5x5 grid of red rectangles"
+
+// Custom size
+"Create a 4x4 grid of 150 pixel circles"
+
+// Custom spacing
+"Make a 2x2 grid with 50 pixel spacing"
+```
+
 ## Next Phase Features (Not Yet Available)
 
-Phase 8.3 will add:
-- "Arrange these shapes in a row"
-- "Create a 3x3 grid"
-- "Center these objects"
+Phase 9 will add:
+- AI Chat UI (no more console!)
+- Message history
+- Typing indicators
 
 ---
 
 **Phase 8.1 Status: ✅ Complete**  
-**Phase 8.2 Status: ✅ Complete**
+**Phase 8.2 Status: ✅ Complete**  
+**Phase 8.3 Status: ✅ Complete**
 

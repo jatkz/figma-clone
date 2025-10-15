@@ -73,17 +73,17 @@ Build an AI Canvas Agent that manipulates the collaborative canvas through natur
 - [x] Handle ambiguous object references
 
 ### 8.3 Layout Commands
-- [ ] Implement arrangement algorithms:
+- [x] Implement arrangement algorithms:
   - "Arrange these shapes in a horizontal row"
   - "Create a vertical stack"
   - "Space these elements evenly"
-- [ ] Implement grid creation:
+- [x] Implement grid creation:
   - "Create a 3x3 grid of squares"
   - "Make a 2x4 grid of circles"
-- [ ] Add alignment operations:
+- [x] Add alignment operations:
   - "Align these shapes to the left"
   - "Center these objects vertically"
-- [ ] Calculate proper spacing and positioning
+- [x] Calculate proper spacing and positioning
 
 ---
 

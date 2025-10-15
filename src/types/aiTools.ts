@@ -163,7 +163,7 @@ export const AI_TOOLS: AITool[] = [
   },
   {
     name: 'arrangeShapes',
-    description: 'Arrange multiple shapes in a specific layout. Examples: "Arrange these shapes in a horizontal row", "Create a vertical stack", "Make a 3x3 grid"',
+    description: 'Arrange existing shapes in a specific layout. Examples: "Arrange these shapes in a horizontal row", "Align these to the left", "Distribute these evenly"',
     parameters: {
       type: 'object',
       properties: {
@@ -189,6 +189,53 @@ export const AI_TOOLS: AITool[] = [
         }
       },
       required: ['shapeIds', 'layout']
+    }
+  },
+  {
+    name: 'createGrid',
+    description: 'Create a grid of NEW shapes. Examples: "Create a 3x3 grid of squares", "Make a 2x4 grid of circles", "Create a 5x5 grid of red rectangles"',
+    parameters: {
+      type: 'object',
+      properties: {
+        shapeType: {
+          type: 'string',
+          description: 'Type of shape to create in the grid',
+          enum: ['rectangle', 'circle', 'text']
+        },
+        rows: {
+          type: 'number',
+          description: 'Number of rows in the grid (1-20)'
+        },
+        columns: {
+          type: 'number',
+          description: 'Number of columns in the grid (1-20)'
+        },
+        shapeSize: {
+          type: 'number',
+          description: 'Size of each shape in pixels (default: 100, min: 50, max: 1000)'
+        },
+        spacing: {
+          type: 'number',
+          description: 'Spacing between shapes in pixels (default: 20)'
+        },
+        color: {
+          type: 'string',
+          description: 'Color for all shapes in the grid (hex code or color name). Random if not specified.'
+        },
+        startX: {
+          type: 'number',
+          description: 'Starting X position (default: centered on canvas)'
+        },
+        startY: {
+          type: 'number',
+          description: 'Starting Y position (default: centered on canvas)'
+        },
+        text: {
+          type: 'string',
+          description: 'Text content (only for text grids, default: "Text")'
+        }
+      },
+      required: ['shapeType', 'rows', 'columns']
     }
   }
 ];

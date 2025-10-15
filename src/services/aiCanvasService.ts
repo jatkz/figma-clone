@@ -688,6 +688,120 @@ export const aiArrangeShapes = async (
           });
         }
         break;
+      
+      case 'align-left':
+        // Align all shapes to the leftmost x position
+        const minX = Math.min(...shapes.map(s => s.x));
+        for (const shape of shapes) {
+          const shapeDimensions = getShapeDimensions(shape);
+          const validCoords = validateCoordinates(minX, shape.y, shapeDimensions.width, shapeDimensions.height);
+          updates.push({
+            id: shape.id,
+            updates: { x: validCoords.x, y: validCoords.y, modifiedBy: userId }
+          });
+        }
+        break;
+        
+      case 'align-right':
+        // Align all shapes to the rightmost x position (accounting for width)
+        const maxRight = Math.max(...shapes.map(s => s.x + getShapeDimensions(s).width));
+        for (const shape of shapes) {
+          const shapeDimensions = getShapeDimensions(shape);
+          const x = maxRight - shapeDimensions.width;
+          const validCoords = validateCoordinates(x, shape.y, shapeDimensions.width, shapeDimensions.height);
+          updates.push({
+            id: shape.id,
+            updates: { x: validCoords.x, y: validCoords.y, modifiedBy: userId }
+          });
+        }
+        break;
+        
+      case 'align-top':
+        // Align all shapes to the topmost y position
+        const minY = Math.min(...shapes.map(s => s.y));
+        for (const shape of shapes) {
+          const shapeDimensions = getShapeDimensions(shape);
+          const validCoords = validateCoordinates(shape.x, minY, shapeDimensions.width, shapeDimensions.height);
+          updates.push({
+            id: shape.id,
+            updates: { x: validCoords.x, y: validCoords.y, modifiedBy: userId }
+          });
+        }
+        break;
+        
+      case 'align-bottom':
+        // Align all shapes to the bottommost y position (accounting for height)
+        const maxBottom = Math.max(...shapes.map(s => s.y + getShapeDimensions(s).height));
+        for (const shape of shapes) {
+          const shapeDimensions = getShapeDimensions(shape);
+          const y = maxBottom - shapeDimensions.height;
+          const validCoords = validateCoordinates(shape.x, y, shapeDimensions.width, shapeDimensions.height);
+          updates.push({
+            id: shape.id,
+            updates: { x: validCoords.x, y: validCoords.y, modifiedBy: userId }
+          });
+        }
+        break;
+        
+      case 'distribute-horizontal':
+        // Distribute shapes evenly along x-axis
+        if (shapes.length < 2) {
+          return {
+            success: false,
+            message: 'Need at least 2 shapes to distribute',
+            error: 'Insufficient shapes'
+          };
+        }
+        
+        // Sort by x position
+        const sortedByX = [...shapes].sort((a, b) => a.x - b.x);
+        const leftmostX = sortedByX[0].x;
+        const rightmostX = sortedByX[sortedByX.length - 1].x + getShapeDimensions(sortedByX[sortedByX.length - 1]).width;
+        const totalSpaceX = rightmostX - leftmostX;
+        const totalWidthX = sortedByX.reduce((sum, s) => sum + getShapeDimensions(s).width, 0);
+        const gapX = shapes.length > 1 ? (totalSpaceX - totalWidthX) / (shapes.length - 1) : 0;
+        
+        let posX = leftmostX;
+        for (const shape of sortedByX) {
+          const shapeDimensions = getShapeDimensions(shape);
+          const validCoords = validateCoordinates(posX, shape.y, shapeDimensions.width, shapeDimensions.height);
+          updates.push({
+            id: shape.id,
+            updates: { x: validCoords.x, y: validCoords.y, modifiedBy: userId }
+          });
+          posX += shapeDimensions.width + gapX;
+        }
+        break;
+        
+      case 'distribute-vertical':
+        // Distribute shapes evenly along y-axis
+        if (shapes.length < 2) {
+          return {
+            success: false,
+            message: 'Need at least 2 shapes to distribute',
+            error: 'Insufficient shapes'
+          };
+        }
+        
+        // Sort by y position
+        const sortedByY = [...shapes].sort((a, b) => a.y - b.y);
+        const topmostY = sortedByY[0].y;
+        const bottommostY = sortedByY[sortedByY.length - 1].y + getShapeDimensions(sortedByY[sortedByY.length - 1]).height;
+        const totalSpaceY = bottommostY - topmostY;
+        const totalHeightY = sortedByY.reduce((sum, s) => sum + getShapeDimensions(s).height, 0);
+        const gapY = shapes.length > 1 ? (totalSpaceY - totalHeightY) / (shapes.length - 1) : 0;
+        
+        let posY = topmostY;
+        for (const shape of sortedByY) {
+          const shapeDimensions = getShapeDimensions(shape);
+          const validCoords = validateCoordinates(shape.x, posY, shapeDimensions.width, shapeDimensions.height);
+          updates.push({
+            id: shape.id,
+            updates: { x: validCoords.x, y: validCoords.y, modifiedBy: userId }
+          });
+          posY += shapeDimensions.height + gapY;
+        }
+        break;
         
       default:
         return {
@@ -712,6 +826,106 @@ export const aiArrangeShapes = async (
     return {
       success: false,
       message: 'Failed to arrange shapes',
+      error: error.message
+    };
+  }
+};
+
+/**
+ * Create a grid of shapes
+ */
+export const aiCreateGrid = async (
+  params: {
+    shapeType: 'rectangle' | 'circle' | 'text';
+    rows: number;
+    columns: number;
+    shapeSize?: number;
+    spacing?: number;
+    color?: string;
+    startX?: number;
+    startY?: number;
+    text?: string;
+  },
+  userId: string
+): Promise<AIOperationResult> => {
+  try {
+    const {
+      shapeType,
+      rows,
+      columns,
+      shapeSize = 100,
+      spacing = 20,
+      color,
+      startX = CANVAS_BOUNDS.CENTER_X - ((columns * shapeSize + (columns - 1) * spacing) / 2),
+      startY = CANVAS_BOUNDS.CENTER_Y - ((rows * shapeSize + (rows - 1) * spacing) / 2),
+      text = 'Text'
+    } = params;
+    
+    // Validate grid parameters
+    if (rows < 1 || rows > 20) {
+      return {
+        success: false,
+        message: 'Grid rows must be between 1 and 20',
+        error: 'Invalid grid size'
+      };
+    }
+    
+    if (columns < 1 || columns > 20) {
+      return {
+        success: false,
+        message: 'Grid columns must be between 1 and 20',
+        error: 'Invalid grid size'
+      };
+    }
+    
+    const totalShapes = rows * columns;
+    if (totalShapes > 100) {
+      return {
+        success: false,
+        message: 'Grid cannot have more than 100 shapes',
+        error: 'Grid too large'
+      };
+    }
+    
+    // Enforce size constraints
+    const validSize = Math.max(50, Math.min(1000, shapeSize));
+    const createdIds: string[] = [];
+    
+    // Create shapes in grid pattern
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < columns; col++) {
+        const x = startX + col * (validSize + spacing);
+        const y = startY + row * (validSize + spacing);
+        
+        // Create shape using aiCreateShape
+        const shapeParams = {
+          type: shapeType,
+          x,
+          y,
+          width: validSize,
+          height: validSize,
+          color,
+          text: shapeType === 'text' ? text : undefined,
+          fontSize: 16
+        };
+        
+        const result = await aiCreateShape(shapeParams, userId);
+        if (result.success && result.objectIds) {
+          createdIds.push(...result.objectIds);
+        }
+      }
+    }
+    
+    return {
+      success: true,
+      message: `Created ${rows}x${columns} grid of ${shapeType}s (${totalShapes} shapes)`,
+      objectIds: createdIds
+    };
+    
+  } catch (error: any) {
+    return {
+      success: false,
+      message: 'Failed to create grid',
       error: error.message
     };
   }
@@ -757,6 +971,9 @@ export const executeAITool = async (
         
       case 'arrangeShapes':
         return await aiArrangeShapes(toolCall.arguments as ArrangeShapesParams, userId);
+        
+      case 'createGrid':
+        return await aiCreateGrid(toolCall.arguments as any, userId);
         
       default:
         return {
