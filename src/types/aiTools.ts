@@ -35,7 +35,7 @@ export interface AIToolParameter {
 export const AI_TOOLS: AITool[] = [
   {
     name: 'createShape',
-    description: 'Create a new shape on the canvas. Examples: "Create a red rectangle", "Make a blue circle at 100, 200", "Add text that says Hello"',
+    description: 'Create a new shape on the canvas. Can be called multiple times in sequence to build complex UI elements like forms, navigation bars, buttons, or card layouts. Use specific coordinates to position elements, then use arrangeShapes to organize them. Examples: "Create a red rectangle", "Make a blue circle at 100, 200", "Add text that says Hello", "Create multiple shapes to build a login form"',
     parameters: {
       type: 'object',
       properties: {

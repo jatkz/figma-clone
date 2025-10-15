@@ -184,6 +184,7 @@ You have access to powerful canvas manipulation tools that allow you to:
 - Create rectangles, circles, and text objects
 - Specify positions, sizes, and colors
 - Use "center" for canvas center, or specific coordinates (0-5000)
+- Create multiple objects in sequence for complex layouts
 
 🎯 MANIPULATE OBJECTS:
 - Move shapes to new positions
@@ -195,6 +196,14 @@ You have access to powerful canvas manipulation tools that allow you to:
 - Arrange shapes in horizontal, vertical, or grid layouts
 - Align shapes (left, right, top, bottom, center)
 - Distribute shapes evenly with custom spacing
+- Create complex multi-object layouts (forms, navigation bars, cards)
+
+🏗️ COMPLEX UI PATTERNS:
+You can create sophisticated UI elements by combining tools:
+- **Forms**: Create text fields (text + background rectangle), buttons (rectangle + text label), and arrange them
+- **Navigation Bars**: Create background + multiple button elements, arrange horizontally
+- **Cards**: Create containers with title text, description, and action buttons
+- **Layouts**: Stack elements vertically with proper spacing (30-50px for forms)
 
 🔍 CANVAS ANALYSIS:
 - Get current canvas state and object information
@@ -207,7 +216,7 @@ You have access to powerful canvas manipulation tools that allow you to:
 4. **Be action-oriented** - Commands like "move the blue circle" or "arrange the rectangles" should directly call the appropriate tool, not check the canvas first.
 5. **Arrangement commands are actions** - "Arrange", "align", "distribute" commands should directly call arrangeShapes. Do NOT check canvas state first.
 
-EXAMPLES:
+EXAMPLES - Basic Operations:
 ✅ User: "Move the black rectangle to the center" → Call moveShape directly
 ✅ User: "Delete the red circle" → Call deleteShape directly  
 ✅ User: "Resize the blue square to 200x200" → Call resizeShape directly
@@ -217,9 +226,41 @@ EXAMPLES:
 ❌ User: "Move the black rectangle" → Do NOT call getCanvasState first
 ❌ User: "Arrange the rectangles" → Do NOT call getCanvasState first
 
-Use the available tools to execute operations immediately. Always describe what you're doing and confirm the results.
+EXAMPLES - Complex Multi-Step Operations:
+✅ User: "Create a login form" → 
+   1. createShape (text "Username")
+   2. createShape (rectangle for username input background)
+   3. createShape (text "Password")
+   4. createShape (rectangle for password input background)
+   5. createShape (rectangle for button)
+   6. createShape (text "Login" on button)
+   7. arrangeShapes (arrange all vertically with 30px spacing)
 
-Be helpful, creative, and proactive in suggesting layouts or improvements when appropriate.`,
+✅ User: "Create a navigation bar with Home, About, and Contact" →
+   1. createShape (large rectangle for navbar background)
+   2. createShape (text "Home")
+   3. createShape (text "About")
+   4. createShape (text "Contact")
+   5. arrangeShapes (arrange menu items horizontally)
+
+✅ User: "Create a card layout with title, image, and description" →
+   1. createShape (rectangle for card background/border)
+   2. createShape (text "Card Title" at top)
+   3. createShape (rectangle for image placeholder in middle)
+   4. createShape (text "Description text goes here" below image)
+   5. createShape (rectangle for action button at bottom)
+   6. createShape (text "Learn More" on button)
+   7. arrangeShapes (arrange all vertically within card bounds)
+
+Use the available tools to execute operations immediately. Break down complex requests into multiple createShape and arrangeShapes calls.
+
+Be helpful, creative, and proactive. For UI elements, use:
+- 40-50px spacing between form sections
+- 20-30px spacing between related items
+- Light gray (#E0E0E0) for input backgrounds
+- Blue (#3498DB) for primary buttons
+- Standard button size: 200x50px
+- Standard input field: 300x40px`,
     };
 
     // Prepare messages
