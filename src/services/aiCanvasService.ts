@@ -783,12 +783,27 @@ export const aiArrangeShapes = async (
   userId: string
 ): Promise<AIOperationResult> => {
   try {
+    console.log(`🎨 [aiArrangeShapes] Starting arrangement:`, {
+      shapeIds: params.shapeIds,
+      layout: params.layout,
+      spacing: params.spacing
+    });
+    
     // Find all shapes to arrange
     const shapes: CanvasObject[] = [];
     for (const shapeId of params.shapeIds) {
       const matchedShapes = findShapesByDescription(shapeId);
+      console.log(`  Found ${matchedShapes.length} shapes matching "${shapeId}"`);
       shapes.push(...matchedShapes);
     }
+    
+    console.log(`📊 [aiArrangeShapes] Total shapes to arrange: ${shapes.length}`);
+    console.log(`📋 [aiArrangeShapes] Shapes:`, shapes.map(s => ({
+      id: s.id.substring(0, 8),
+      type: s.type,
+      color: hexToColorName(s.color),
+      position: `(${s.x}, ${s.y})`
+    })));
     
     if (shapes.length === 0) {
       return {
@@ -803,17 +818,27 @@ export const aiArrangeShapes = async (
     
     switch (params.layout) {
       case 'horizontal':
+        console.log(`\n➡️ [aiArrangeShapes] Horizontal layout`);
+        // For horizontal arrangement, align all shapes on the same Y coordinate
+        const baseY = shapes[0].y;
+        console.log(`  Base Y coordinate: ${baseY}`);
+        
         let currentX = shapes[0].x;
+        console.log(`  Starting X: ${currentX}`);
+        
         for (let i = 0; i < shapes.length; i++) {
           const shape = shapes[i];
           if (i > 0) {
             const prevShape = shapes[i - 1];
             const prevDimensions = getShapeDimensions(prevShape);
             currentX += prevDimensions.width + spacing;
+            console.log(`  Shape ${i}: Moving right by ${prevDimensions.width} + ${spacing} = new X: ${currentX}`);
           }
           
           const shapeDimensions = getShapeDimensions(shape);
-          const validCoords = validateCoordinates(currentX, shape.y, shapeDimensions.width, shapeDimensions.height);
+          const validCoords = validateCoordinates(currentX, baseY, shapeDimensions.width, shapeDimensions.height);
+          console.log(`  Shape ${i} (${hexToColorName(shape.color)} ${shape.type}): (${shape.x}, ${shape.y}) → (${validCoords.x}, ${validCoords.y})`);
+          
           updates.push({
             id: shape.id,
             updates: { x: validCoords.x, y: validCoords.y, modifiedBy: userId }
@@ -822,17 +847,27 @@ export const aiArrangeShapes = async (
         break;
         
       case 'vertical':
+        console.log(`\n⬇️ [aiArrangeShapes] Vertical layout`);
+        // For vertical arrangement, align all shapes on the same X coordinate
+        const baseX = shapes[0].x;
+        console.log(`  Base X coordinate: ${baseX}`);
+        
         let currentY = shapes[0].y;
+        console.log(`  Starting Y: ${currentY}`);
+        
         for (let i = 0; i < shapes.length; i++) {
           const shape = shapes[i];
           if (i > 0) {
             const prevShape = shapes[i - 1];
             const prevDimensions = getShapeDimensions(prevShape);
             currentY += prevDimensions.height + spacing;
+            console.log(`  Shape ${i}: Moving down by ${prevDimensions.height} + ${spacing} = new Y: ${currentY}`);
           }
           
           const shapeDimensions = getShapeDimensions(shape);
-          const validCoords = validateCoordinates(shape.x, currentY, shapeDimensions.width, shapeDimensions.height);
+          const validCoords = validateCoordinates(baseX, currentY, shapeDimensions.width, shapeDimensions.height);
+          console.log(`  Shape ${i} (${hexToColorName(shape.color)} ${shape.type}): (${shape.x}, ${shape.y}) → (${validCoords.x}, ${validCoords.y})`);
+          
           updates.push({
             id: shape.id,
             updates: { x: validCoords.x, y: validCoords.y, modifiedBy: userId }

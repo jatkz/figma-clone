@@ -163,13 +163,13 @@ export const AI_TOOLS: AITool[] = [
   },
   {
     name: 'arrangeShapes',
-    description: 'Arrange existing shapes in a specific layout. Examples: "Arrange these shapes in a horizontal row", "Align these to the left", "Distribute these evenly"',
+    description: 'Arrange existing shapes in a specific layout. Object finding is AUTOMATIC - you can reference shapes by description (e.g., "the rectangles", "all circles", "red rectangle and blue circle") and the system will find them. Use this tool directly without checking canvas state first. Examples: "Arrange the rectangles in a horizontal row", "Arrange the red circle, blue rectangle, and green square horizontally", "Align the circles to the left", "Distribute the shapes evenly"',
     parameters: {
       type: 'object',
       properties: {
         shapeIds: {
           type: 'array',
-          description: 'Array of shape IDs or descriptions to arrange (e.g., ["red rectangle", "blue circle"])',
+          description: 'Array of shape descriptions to arrange. Use descriptions like "rectangle", "red circle", "blue rectangle", "the rectangles" (finds all rectangles), "circle" (finds all circles). The system automatically finds matching objects.',
           items: {
             type: 'string'
           }
