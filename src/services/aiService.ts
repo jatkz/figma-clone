@@ -299,6 +299,15 @@ EXAMPLES - Complex Multi-Step Operations:
 
 Use the available tools to execute operations immediately. Break down complex requests into multiple createShape and arrangeShapes calls.
 
+IMPORTANT - Creation Order for Proper Layering:
+When creating buttons, cards, forms, or any UI components with text on shapes:
+1. ALWAYS create background/container rectangles FIRST
+2. Create structural elements (input fields, dividers, image placeholders) next
+3. Create text elements LAST (this ensures text appears on top of shapes)
+
+Example: For a button, create rectangle background first, then text on top.
+Example: For a card, create card background first, then image placeholder, then all text elements last.
+
 Be helpful, creative, and proactive. For UI elements, use:
 - 40-50px spacing between form sections
 - 20-30px spacing between related items

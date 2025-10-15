@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback, useEffect } from 'react';
+import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { Stage, Layer, Line, Rect } from 'react-konva';
 import Konva from 'konva';
 import {
@@ -95,6 +95,16 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
 
   // Cursor position state for multiplayer cursor tracking
   const [, setCursorPosition] = useState<{ x: number; y: number } | null>(null);
+
+  // Sort objects by type to ensure proper layering (text on top)
+  // Memoized to avoid re-sorting on every render
+  const sortedObjects = useMemo(() => {
+    return [...objects].sort((a, b) => {
+      // Render order: rectangles first, then circles, then text (text on top)
+      const typeOrder: Record<string, number> = { rectangle: 0, circle: 1, text: 2 };
+      return (typeOrder[a.type] || 0) - (typeOrder[b.type] || 0);
+    });
+  }, [objects]);
 
   // Auto-deselect object when switching to creation tools
   useEffect(() => {
@@ -573,8 +583,8 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
             height={CANVAS_HEIGHT}
           />
           
-          {/* Render canvas objects */}
-          {objects.map(object => {
+          {/* Render canvas objects - sorted by type to ensure text appears on top */}
+          {sortedObjects.map(object => {
             const userMap = new Map();
             if (user?.id) {
               userMap.set(user.id, {
