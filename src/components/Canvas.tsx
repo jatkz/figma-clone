@@ -65,10 +65,10 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
   );
 
   // Real-time canvas state from Firestore
-  const { 
-    objects, 
-    isLoading, 
-    error, 
+  const {
+    objects,
+    isLoading,
+    error,
     isConnected,
     createObjectOptimistic,
     updateObjectOptimistic,
@@ -94,6 +94,21 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
 
   // Cursor position state for multiplayer cursor tracking
   const [, setCursorPosition] = useState<{ x: number; y: number } | null>(null);
+
+  // Auto-deselect object when switching to creation tools
+  useEffect(() => {
+    const isCreationTool = activeTool === 'rectangle' || activeTool === 'circle' || activeTool === 'text';
+    
+    if (isCreationTool && selectedObjectId) {
+      // Release lock and deselect when switching to creation tools
+      const deselectObject = async () => {
+        await releaseObjectLock(selectedObjectId);
+        setSelectedObjectId(null);
+      };
+      
+      deselectObject();
+    }
+  }, [activeTool, selectedObjectId, releaseObjectLock]);
 
   // Other users' cursors from Firestore
   const [otherCursors, setOtherCursors] = useState<Map<string, CursorData>>(new Map());
@@ -557,7 +572,6 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
             }
             
             const sharedProps = {
-              key: object.id,
               isSelected: selectedObjectId === object.id,
               onSelect: handleRectangleClick,
               onDeselect: () => handleRectangleClick(''),
@@ -572,6 +586,7 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
               case 'rectangle':
                 return (
                   <Rectangle
+                    key={object.id}
                     {...sharedProps}
                     object={object}
                     onClick={handleRectangleClick}
@@ -580,6 +595,7 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
               case 'circle':
                 return (
                   <CircleComponent
+                    key={object.id}
                     {...sharedProps}
                     circle={object}
                   />
@@ -587,6 +603,7 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
               case 'text':
                 return (
                   <TextObjectComponent
+                    key={object.id}
                     {...sharedProps}
                     textObject={object}
                   />

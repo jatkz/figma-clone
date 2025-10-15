@@ -5,6 +5,7 @@ import {
   createObject,
   updateObject,
   deleteObject,
+  deleteAllObjects,
   acquireLock,
   releaseLock,
   releaseExpiredLocks
@@ -24,6 +25,7 @@ interface UseCanvasActions {
   createObjectOptimistic: (objectData: CanvasObjectInput) => Promise<CanvasObject | null>;
   updateObjectOptimistic: (objectId: string, updates: CanvasObjectUpdate) => Promise<CanvasObject | null>;
   deleteObjectOptimistic: (objectId: string) => Promise<boolean>;
+  deleteAllObjectsOptimistic: () => Promise<boolean>;
   initializeCanvasIfNeeded: () => Promise<void>;
   acquireObjectLock: (objectId: string, lockingUserName?: string) => Promise<boolean>;
   releaseObjectLock: (objectId: string) => Promise<boolean>;
@@ -95,9 +97,36 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
         const unsubscribe = subscribeToObjects((newObjects) => {
           if (!mounted) return;
 
-          console.log(`📦 Received ${newObjects.length} objects from Firestore`);
-          setObjects(newObjects);
-          lastKnownGoodStateRef.current = [...newObjects]; // Deep copy for rollback
+          // Merge Firestore objects with any local temporary objects
+          setObjects(prev => {
+            // Keep any temporary objects that aren't represented in Firestore yet
+            const tempObjects = prev.filter(obj => {
+              const isTemp = obj.id.startsWith('temp_');
+              if (!isTemp) return false;
+              
+              // Only keep temp objects that don't have a Firestore counterpart
+              // Use more lenient matching to account for floating point precision
+              const hasFirestoreVersion = newObjects.some(fsObj => 
+                Math.abs(fsObj.x - obj.x) < 1 && 
+                Math.abs(fsObj.y - obj.y) < 1 && 
+                fsObj.type === obj.type &&
+                fsObj.createdBy === obj.createdBy
+              );
+              
+              return !hasFirestoreVersion;
+            });
+            
+            // Create a Map to ensure no duplicate IDs from Firestore
+            const firestoreMap = new Map();
+            newObjects.forEach(obj => firestoreMap.set(obj.id, obj));
+            
+            // Combine temp objects with unique Firestore objects
+            const merged = [...tempObjects, ...Array.from(firestoreMap.values())];
+            
+            return merged;
+          });
+          
+          lastKnownGoodStateRef.current = [...newObjects]; // Deep copy for rollback (Firestore objects only)
           setIsConnected(true);
           setError(null);
         });
@@ -181,38 +210,33 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
   const createObjectOptimistic = useCallback(async (
     objectData: CanvasObjectInput
   ): Promise<CanvasObject | null> => {
-    try {
-      // Generate temporary ID for optimistic update
-      const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-      const optimisticObject: any = {
-        ...objectData,
-        id: tempId
-      };
+    // Use the existing temp ID from the object data (shapes come with pre-generated IDs)
+    const tempId = (objectData as any).id;
+    if (!tempId) {
+      throw new Error('Object data must have a temporary ID');
+    }
+    
+        try {
+          const optimisticObject: any = {
+            ...objectData,
+            id: tempId
+          };
 
-      // 1. Create locally (optimistic)
-      console.log('✨ Creating object optimistically:', tempId);
-      setObjects(prev => [...prev, optimisticObject]);
+          // 1. Create locally (optimistic)
+          setObjects(prev => [...prev, optimisticObject]);
 
-      // 2. Send to Firestore
-      console.log('📤 Sending object to Firestore...');
-      const createdObject = await createObject(objectData);
+          // 2. Send to Firestore
+          const createdObject = await createObject(objectData);
 
-      // 3. Update local object with returned ID
-      console.log('🔄 Updating local object with Firestore ID:', createdObject.id);
-      setObjects(prev => 
-        prev.map(obj => 
-          obj.id === tempId ? createdObject : obj
-        )
-      );
+          // 3. Real-time listener will automatically handle the temp-to-real replacement
+          // based on the matching position and properties
+          return createdObject;
 
-      console.log('✅ Object creation completed successfully');
-      return createdObject;
-
-    } catch (error) {
-      console.error('❌ Object creation failed:', error);
+        } catch (error) {
+          console.error('Object creation failed:', error);
       
-      // Rollback: remove the optimistic object
-      setObjects(prev => prev.filter(obj => !obj.id.startsWith('temp-')));
+      // Rollback: remove the specific optimistic object that failed
+      setObjects(prev => prev.filter(obj => obj.id !== tempId));
       toast('Failed to create object', 'error');
       
       return null;
@@ -232,9 +256,8 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
         return null;
       }
 
-      // 1. Update locally immediately
-      console.log('🔄 Updating object optimistically:', objectId);
-      const updatedObject: any = {
+        // 1. Update locally immediately
+        const updatedObject: any = {
         ...currentObject,
         ...updates,
         version: currentObject.version + 1
@@ -303,10 +326,40 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
     }
   }, [toast]);
 
+  // Optimistic delete all objects
+  const deleteAllObjectsOptimistic = useCallback(async (): Promise<boolean> => {
+      try {
+        // 1. Clear local state immediately
+        setObjects([]);
+        toast('Clearing canvas...', 'info');
+        
+        // 2. Delete all objects from Firestore
+        const deletedCount = await deleteAllObjects();
+        
+        toast(`Deleted ${deletedCount} objects from canvas`, 'success');
+        return true;
+        
+      } catch (error) {
+        console.error('Failed to delete all objects:', error);
+      toast('Failed to clear canvas', 'error');
+      
+      // Note: We don't rollback here since the real-time listener will restore 
+      // the correct state from Firestore if the deletion failed
+      return false;
+    }
+  }, [toast]);
+
   // Acquire lock on an object with enhanced user messaging
   const acquireObjectLock = useCallback(async (objectId: string, lockingUserName?: string): Promise<boolean> => {
     if (!userId) {
       console.warn('Cannot acquire lock: user ID not provided');
+      return false;
+    }
+
+    // Check if this is a temporary ID - if so, the object hasn't been created in Firestore yet
+    if (objectId.startsWith('temp_')) {
+      console.log(`⚠️  Cannot acquire lock on temporary object ${objectId} - object not yet in Firestore`);
+      toast('Please wait for object creation to complete', 'warning', 1500);
       return false;
     }
 
@@ -359,6 +412,7 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
     createObjectOptimistic,
     updateObjectOptimistic,
     deleteObjectOptimistic,
+    deleteAllObjectsOptimistic,
     initializeCanvasIfNeeded,
     acquireObjectLock,
     releaseObjectLock

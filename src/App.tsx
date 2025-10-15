@@ -7,6 +7,9 @@ import PresenceIndicator from './components/PresenceIndicator';
 import UserList from './components/UserList';
 import { ToastProvider, useToastContext } from './contexts/ToastContext';
 import { ToastManager } from './components/Toast';
+import { useCanvas } from './hooks/useCanvas';
+import { useAuth } from './hooks/useAuth';
+import { createToastFunction } from './contexts/ToastContext';
 import './App.css';
 
 
@@ -14,6 +17,9 @@ function AppContent() {
   const { activeTool, setActiveTool } = useToolState('select');
   const [showUserList, setShowUserList] = useState(false);
   const { toasts, removeToast } = useToastContext();
+  const { user } = useAuth();
+  const toastFunction = createToastFunction(useToastContext());
+  const { deleteAllObjectsOptimistic } = useCanvas(user?.id, toastFunction);
 
 
   return (
@@ -46,6 +52,19 @@ function AppContent() {
                     }`}
                   >
                     👥 Users
+                  </button>
+
+                  {/* Clear Canvas Button */}
+                  <button
+                    onClick={() => {
+                      if (window.confirm('Are you sure you want to delete all objects from the canvas? This cannot be undone.')) {
+                        deleteAllObjectsOptimistic();
+                      }
+                    }}
+                    className="px-3 py-1 text-sm rounded-lg font-medium transition-colors flex-shrink-0 bg-red-100 hover:bg-red-200 text-red-700 border border-red-200"
+                    title="Delete all objects from canvas"
+                  >
+                    🗑️ Clear All
                   </button>
                 </div>
                 <div className="flex-shrink-0">

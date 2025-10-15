@@ -168,9 +168,10 @@ export const createObject = async (objectData: CanvasObjectInput): Promise<Canva
     
     const objectsCollectionRef = collection(db, OBJECTS_COLLECTION_PATH);
     
-    // Prepare data for Firestore
+    // Prepare data for Firestore - REMOVE the temporary ID!
+    const { id, ...dataWithoutId } = objectData as any;
     const firestoreData = {
-      ...objectData,
+      ...dataWithoutId,
       createdAt: serverTimestamp(),
       modifiedAt: serverTimestamp()
     };
@@ -274,6 +275,28 @@ export const deleteObject = async (objectId: string): Promise<void> => {
   } catch (error) {
     console.error('Error deleting object:', error);
     throw new Error('Failed to delete object');
+  }
+};
+
+/**
+ * Delete all canvas objects from Firestore
+ * @returns Promise resolving to number of objects deleted
+ */
+export const deleteAllObjects = async (): Promise<number> => {
+  try {
+    console.log('🗑️ Deleting all objects from Firestore...');
+    const objectsCollectionRef = collection(db, OBJECTS_COLLECTION_PATH);
+    const snapshot = await getDocs(objectsCollectionRef);
+    
+    const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref));
+    await Promise.all(deletePromises);
+    
+    const deletedCount = snapshot.docs.length;
+    console.log(`✅ Deleted ${deletedCount} objects from Firestore`);
+    return deletedCount;
+  } catch (error) {
+    console.error('Error deleting all objects:', error);
+    throw new Error('Failed to delete all objects');
   }
 };
 
@@ -500,7 +523,6 @@ export const updateCursor = async (
     };
 
     await setDoc(cursorDocRef, cursorData);
-    console.log(`📍 Cursor updated for user ${userId} at (${x}, ${y})`);
   } catch (error) {
     console.error('Error updating cursor:', error);
     // Don't throw error for cursor updates - they're not critical
@@ -528,7 +550,6 @@ export const subscribeToCursors = (
         cursors.set(doc.id, data);
       });
       
-      console.log(`📍 Received ${cursors.size} cursor positions`);
       callback(cursors);
     },
     (error) => {
