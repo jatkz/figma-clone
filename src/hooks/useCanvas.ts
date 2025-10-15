@@ -183,8 +183,8 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
     };
   }, [userId, isConnected]);
 
-  // Throttled Firestore update function (500ms for production-grade efficiency)
-  const throttledFirestoreUpdate = useCallback(
+  // Throttled object update function (250ms for production-grade efficiency)
+  const throttledObjectUpdate = useCallback(
     throttle(async (objectId: string, updates: CanvasObjectUpdate) => {
       try {
         await updateObject(objectId, updates);
@@ -202,7 +202,7 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
         // Clear pending update
         pendingUpdatesRef.current.delete(objectId);
       }
-    }, 100),
+    }, 250),
     []
   );
 
@@ -269,9 +269,9 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
         )
       );
 
-      // 2. Store pending update and use throttled Firestore update
+      // 2. Store pending update and use throttled object update
       pendingUpdatesRef.current.set(objectId, updates);
-      throttledFirestoreUpdate(objectId, updates);
+      throttledObjectUpdate(objectId, updates);
 
       return updatedObject;
 
@@ -280,7 +280,7 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
       toast('Update failed', 'error');
       return null;
     }
-  }, [objects, throttledFirestoreUpdate]);
+  }, [objects, throttledObjectUpdate]);
 
   // Optimistic object deletion
   const deleteObjectOptimistic = useCallback(async (objectId: string): Promise<boolean> => {
