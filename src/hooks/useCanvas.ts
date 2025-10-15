@@ -183,7 +183,8 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
     };
   }, [userId, isConnected]);
 
-  // Throttled object update function (250ms for production-grade efficiency)
+  // Throttled object update function (configurable via environment variable)
+  const objectThrottle = parseInt(import.meta.env.VITE_OBJECT_SYNC_THROTTLE) || 250;
   const throttledObjectUpdate = useCallback(
     throttle(async (objectId: string, updates: CanvasObjectUpdate) => {
       try {
@@ -202,8 +203,8 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
         // Clear pending update
         pendingUpdatesRef.current.delete(objectId);
       }
-    }, 250),
-    []
+    }, objectThrottle),
+    [objectThrottle]
   );
 
   // Optimistic object creation

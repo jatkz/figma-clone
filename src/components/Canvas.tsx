@@ -113,7 +113,8 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
   // Other users' cursors from Firestore
   const [otherCursors, setOtherCursors] = useState<Map<string, CursorData>>(new Map());
 
-  // Throttled cursor update function (250ms throttle)
+  // Throttled cursor update function (configurable via environment variable)
+  const cursorThrottle = parseInt(import.meta.env.VITE_CURSOR_SYNC_THROTTLE) || 250;
   const throttledCursorUpdate = useCallback(
     throttle(async (x: number, y: number) => {
       if (!user?.id || !user?.displayName || !user?.cursorColor) {
@@ -125,8 +126,8 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
       } catch (error) {
         console.warn('Failed to update cursor position:', error);
       }
-    }, 250),
-    [user?.id, user?.displayName, user?.cursorColor]
+    }, cursorThrottle),
+    [user?.id, user?.displayName, user?.cursorColor, cursorThrottle]
   );
 
   // Update stage size on window resize

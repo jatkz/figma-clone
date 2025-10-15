@@ -15,6 +15,8 @@ interface ImportMetaEnv {
   readonly VITE_AI_MODEL?: string
   readonly VITE_AI_MAX_TOKENS?: string
   readonly VITE_AI_TEMPERATURE?: string
+  readonly VITE_CURSOR_SYNC_THROTTLE: string
+  readonly VITE_OBJECT_SYNC_THROTTLE: string
 }
 
 interface ImportMeta {
