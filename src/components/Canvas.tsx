@@ -178,7 +178,6 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
         }
       });
 
-      console.log(`👥 Received ${filteredCursors.size} other user cursors`);
       setOtherCursors(filteredCursors);
     });
 
