@@ -33,6 +33,104 @@ import { getShapeDimensions } from '../utils/shapeUtils';
 // ============================================================================
 
 /**
+ * Color name to hex code mapping
+ * Maps common color names to their hex codes for better matching
+ */
+const COLOR_NAME_MAP: Record<string, string[]> = {
+  // Black and white
+  'black': ['#000000', '#000'],
+  'white': ['#FFFFFF', '#FFF'],
+  
+  // Primary colors (matching generateRandomColor exactly)
+  'red': ['#FF0000', '#F00', '#FF6B6B', '#E74C3C', '#C0392B'],
+  'green': ['#00FF00', '#0F0', '#52C78C', '#2ECC71', '#27AE60', '#52B788', '#98D8C8'],
+  'blue': ['#0000FF', '#00F', '#45B7D1', '#3498DB', '#2980B9', '#85C1E2'],
+  
+  // Secondary colors (matching generateRandomColor exactly)
+  'yellow': ['#FFFF00', '#FF0', '#F7DC6F', '#F1C40F', '#F39C12', '#F8B739'],
+  'orange': ['#FFA500', '#FFA07A', '#E67E22', '#D35400'],
+  'purple': ['#800080', '#BB8FCE', '#9B59B6', '#8E44AD'],
+  'pink': ['#FFC0CB', '#FF69B4', '#E91E63'],
+  
+  // Tertiary colors (matching generateRandomColor exactly)
+  'cyan': ['#00FFFF', '#0FF', '#4ECDC4', '#1ABC9C', '#16A085'],
+  'teal': ['#008080', '#4ECDC4', '#1ABC9C'],
+  'turquoise': ['#40E0D0', '#4ECDC4'],
+  'magenta': ['#FF00FF', '#F0F'],
+  'lime': ['#00FF00', '#0F0'],
+  
+  // Grays
+  'gray': ['#808080', '#GRAY', '#GREY', '#A9A9A9', '#D3D3D3'],
+  'grey': ['#808080', '#GRAY', '#GREY', '#A9A9A9', '#D3D3D3'],
+  'silver': ['#C0C0C0'],
+  
+  // Browns
+  'brown': ['#A52A2A', '#8B4513', '#D2691E'],
+};
+
+/**
+ * Normalize a color to lowercase hex format for comparison
+ */
+const normalizeColor = (color: string): string => {
+  return color.toLowerCase().trim();
+};
+
+/**
+ * Convert hex color to human-readable color name (for display purposes)
+ * @param hexColor Hex color code (e.g., "#FF6B6B")
+ * @returns Color name (e.g., "red") or the original hex if no match
+ */
+const hexToColorName = (hexColor: string): string => {
+  const normalized = normalizeColor(hexColor);
+  
+  for (const [colorName, hexCodes] of Object.entries(COLOR_NAME_MAP)) {
+    if (hexCodes.some(hex => normalizeColor(hex) === normalized)) {
+      return colorName;
+    }
+  }
+  
+  // Return hex if no color name found
+  return hexColor;
+};
+
+/**
+ * Check if a color matches a color name or hex code
+ * @param objectColor The hex color of the object (e.g., "#FF6B6B")
+ * @param searchTerm The search term (e.g., "red" or "#ff0000")
+ * @returns true if they match
+ */
+const colorsMatch = (objectColor: string, searchTerm: string): boolean => {
+  const normalizedObjectColor = normalizeColor(objectColor);
+  const normalizedSearch = normalizeColor(searchTerm);
+  
+  console.log(`  🎨 [colorsMatch] Checking: object="${objectColor}" (normalized: "${normalizedObjectColor}") vs search="${searchTerm}" (normalized: "${normalizedSearch}")`);
+  
+  // Direct match (e.g., "#ff0000" matches "#ff0000")
+  if (normalizedObjectColor === normalizedSearch) {
+    console.log(`    ✅ Direct hex match!`);
+    return true;
+  }
+  
+  // Check if search term is a color name
+  for (const [colorName, hexCodes] of Object.entries(COLOR_NAME_MAP)) {
+    if (normalizedSearch.includes(colorName)) {
+      console.log(`    🔍 Search includes color name: "${colorName}"`);
+      console.log(`    📋 Checking against hex codes:`, hexCodes);
+      const matches = hexCodes.some(hex => normalizedObjectColor === normalizeColor(hex));
+      if (matches) {
+        console.log(`    ✅ COLOR MATCH! "${objectColor}" matches color name "${colorName}"`);
+        return true;
+      } else {
+        console.log(`    ❌ No match for "${colorName}"`);
+      }
+    }
+  }
+  
+  console.log(`    ❌ No color match found`);
+  return false;
+};
+
+/**
  * Generate a random color for shapes
  */
 const generateRandomColor = (): string => {
@@ -93,52 +191,98 @@ export const cleanupAICanvasState = () => {
 export const findShapesByDescription = (description: string): CanvasObject[] => {
   const desc = description.toLowerCase().trim();
   
+  console.log(`🔍 [findShapesByDescription] Searching for: "${description}"`);
+  console.log(`📊 [findShapesByDescription] Total objects on canvas: ${currentCanvasObjects.length}`);
+  console.log(`📋 [findShapesByDescription] Available objects:`, currentCanvasObjects.map(obj => ({
+    id: obj.id.substring(0, 8),
+    type: obj.type,
+    color: obj.color,
+    position: `(${obj.x}, ${obj.y})`
+  })));
+  
   // If it looks like an exact ID, try that first
   if (desc.length > 10 && !desc.includes(' ')) {
     const exactMatch = currentCanvasObjects.find(obj => obj.id === description);
-    if (exactMatch) return [exactMatch];
+    if (exactMatch) {
+      console.log(`✅ Found by exact ID match`);
+      return [exactMatch];
+    }
   }
   
-  let matches: CanvasObject[] = [];
+  // Priority-based matching system
+  let colorAndTypeMatches: CanvasObject[] = [];
+  let typeOnlyMatches: CanvasObject[] = [];
+  let colorOnlyMatches: CanvasObject[] = [];
+  let positionMatches: CanvasObject[] = [];
   
-  // First pass: find by color, type, and position
+  // First pass: categorize matches by priority
   for (const obj of currentCanvasObjects) {
-    const objColor = obj.color.toLowerCase();
     const objType = obj.type.toLowerCase();
     
-    let isMatch = false;
+    console.log(`\n🔎 [findShapesByDescription] Checking object:`, {
+      id: obj.id.substring(0, 8),
+      type: objType,
+      color: obj.color
+    });
     
-    // Check for color + type matches (e.g., "blue rectangle") - highest priority
-    if (desc.includes(objColor) && desc.includes(objType)) {
-      matches.push(obj);
-      isMatch = true;
-      continue;
+    const colorMatches = colorsMatch(obj.color, desc);
+    const typeMatches = desc.includes(objType) || desc.includes(`the ${objType}`);
+    
+    console.log(`  📊 Type matches: ${typeMatches}, Color matches: ${colorMatches}`);
+    
+    // Priority 1: Color + Type matches (highest priority)
+    if (colorMatches && typeMatches) {
+      console.log(`  ✅ MATCHED by color+type (PRIORITY 1) ⭐⭐⭐`);
+      colorAndTypeMatches.push(obj);
+      continue; // Don't check lower priorities
     }
     
-    // Check for type matches (e.g., "rectangle", "the circle")
-    if (desc.includes(objType) || desc.includes(`the ${objType}`)) {
-      matches.push(obj);
-      isMatch = true;
+    // Priority 2: Type-only matches
+    if (typeMatches) {
+      console.log(`  ✅ MATCHED by type only (PRIORITY 2) ⭐⭐`);
+      typeOnlyMatches.push(obj);
+      continue; // Don't check lower priorities
     }
     
-    // Check for color matches (e.g., "blue", "the red one")
-    if (!isMatch && desc.includes(objColor)) {
-      matches.push(obj);
-      isMatch = true;
+    // Priority 3: Color-only matches
+    if (colorMatches) {
+      console.log(`  ✅ MATCHED by color only (PRIORITY 3) ⭐`);
+      colorOnlyMatches.push(obj);
+      continue; // Don't check lower priorities
     }
     
-    // Check for position-based descriptions (e.g., "top", "left")
-    if (!isMatch) {
-      if (desc.includes('top') && obj.y < CANVAS_BOUNDS.CENTER_Y) {
-        matches.push(obj);
-      } else if (desc.includes('bottom') && obj.y > CANVAS_BOUNDS.CENTER_Y) {
-        matches.push(obj);
-      } else if (desc.includes('left') && obj.x < CANVAS_BOUNDS.CENTER_X) {
-        matches.push(obj);
-      } else if (desc.includes('right') && obj.x > CANVAS_BOUNDS.CENTER_X) {
-        matches.push(obj);
-      }
+    // Priority 4: Position-based matches (lowest priority)
+    if (desc.includes('top') && obj.y < CANVAS_BOUNDS.CENTER_Y) {
+      console.log(`  ✅ MATCHED by position (top) (PRIORITY 4)`);
+      positionMatches.push(obj);
+    } else if (desc.includes('bottom') && obj.y > CANVAS_BOUNDS.CENTER_Y) {
+      console.log(`  ✅ MATCHED by position (bottom) (PRIORITY 4)`);
+      positionMatches.push(obj);
+    } else if (desc.includes('left') && obj.x < CANVAS_BOUNDS.CENTER_X) {
+      console.log(`  ✅ MATCHED by position (left) (PRIORITY 4)`);
+      positionMatches.push(obj);
+    } else if (desc.includes('right') && obj.x > CANVAS_BOUNDS.CENTER_X) {
+      console.log(`  ✅ MATCHED by position (right) (PRIORITY 4)`);
+      positionMatches.push(obj);
+    } else {
+      console.log(`  ❌ No match`);
     }
+  }
+  
+  // Return matches in priority order (highest priority first)
+  let matches: CanvasObject[] = [];
+  if (colorAndTypeMatches.length > 0) {
+    console.log(`\n🎯 Using ${colorAndTypeMatches.length} color+type match(es) (PRIORITY 1)`);
+    matches = colorAndTypeMatches;
+  } else if (typeOnlyMatches.length > 0) {
+    console.log(`\n🎯 Using ${typeOnlyMatches.length} type-only match(es) (PRIORITY 2)`);
+    matches = typeOnlyMatches;
+  } else if (colorOnlyMatches.length > 0) {
+    console.log(`\n🎯 Using ${colorOnlyMatches.length} color-only match(es) (PRIORITY 3)`);
+    matches = colorOnlyMatches;
+  } else if (positionMatches.length > 0) {
+    console.log(`\n🎯 Using ${positionMatches.length} position match(es) (PRIORITY 4)`);
+    matches = positionMatches;
   }
   
   // Second pass: apply superlatives if present
@@ -174,6 +318,14 @@ export const findShapesByDescription = (description: string): CanvasObject[] => 
     }
   }
   
+  console.log(`\n🎯 [findShapesByDescription] Found ${matches.length} match(es):`, matches.map(obj => ({
+    id: obj.id.substring(0, 8),
+    type: obj.type,
+    color: obj.color,
+    colorName: hexToColorName(obj.color),
+    position: `(${obj.x}, ${obj.y})`
+  })));
+  
   return matches;
 };
 
@@ -182,9 +334,11 @@ export const findShapesByDescription = (description: string): CanvasObject[] => 
  * Logs a warning if multiple matches are found
  */
 export const findSingleShape = (description: string): CanvasObject | null => {
+  console.log(`🎯 [findSingleShape] Looking for: "${description}"`);
   const matches = findShapesByDescription(description);
   
   if (matches.length === 0) {
+    console.log(`❌ [findSingleShape] No matches found`);
     return null;
   }
   
@@ -194,6 +348,14 @@ export const findSingleShape = (description: string): CanvasObject | null => {
       matches.map(obj => ({ id: obj.id, type: obj.type, color: obj.color, position: `(${obj.x}, ${obj.y})` }))
     );
   }
+  
+  console.log(`✅ [findSingleShape] Returning:`, {
+    id: matches[0].id.substring(0, 8),
+    type: matches[0].type,
+    color: matches[0].color,
+    colorName: hexToColorName(matches[0].color),
+    position: `(${matches[0].x}, ${matches[0].y})`
+  });
   
   return matches[0];
 };
@@ -328,13 +490,22 @@ export const aiMoveShape = async (
   userId: string
 ): Promise<AIOperationResult> => {
   try {
+    console.log(`🚀 [aiMoveShape] Starting move operation:`, {
+      shapeId: params.shapeId,
+      targetX: params.x,
+      targetY: params.y,
+      userId
+    });
+    
     const shape = findSingleShape(params.shapeId);
     
     if (!shape) {
-      // Provide helpful error with available shapes
+      // Provide helpful error with available shapes (using color names)
       const availableShapes = currentCanvasObjects.map(obj => 
-        `${obj.color} ${obj.type}`
+        `${hexToColorName(obj.color)} ${obj.type}`
       ).join(', ');
+      
+      console.log(`❌ [aiMoveShape] Shape not found. Available shapes:`, availableShapes);
       
       return {
         success: false,
@@ -343,10 +514,23 @@ export const aiMoveShape = async (
       };
     }
     
+    console.log(`📍 [aiMoveShape] Shape found:`, {
+      id: shape.id.substring(0, 8),
+      type: shape.type,
+      color: shape.color,
+      colorName: hexToColorName(shape.color),
+      currentPosition: `(${shape.x}, ${shape.y})`
+    });
+    
     // Resolve and validate coordinates  
     const coords = resolveCoordinates(params.x, params.y);
+    console.log(`🎯 [aiMoveShape] Resolved coordinates:`, coords);
+    
     const { width, height } = getShapeDimensions(shape);
+    console.log(`📏 [aiMoveShape] Shape dimensions:`, { width, height });
+    
     const validCoords = validateCoordinates(coords.x, coords.y, width, height);
+    console.log(`✅ [aiMoveShape] Validated coordinates:`, validCoords);
     
     const updates: CanvasObjectUpdate = {
       x: validCoords.x,
@@ -354,11 +538,14 @@ export const aiMoveShape = async (
       modifiedBy: userId
     };
     
+    console.log(`💾 [aiMoveShape] Updating object...`);
     await updateObject(shape.id, updates);
+    
+    console.log(`✅ [aiMoveShape] Move completed successfully`);
     
     return {
       success: true,
-      message: `Moved ${shape.type} to position (${validCoords.x}, ${validCoords.y})`,
+      message: `Moved ${hexToColorName(shape.color)} ${shape.type} to position (${validCoords.x}, ${validCoords.y})`,
       objectIds: [shape.id]
     };
     
@@ -382,9 +569,9 @@ export const aiResizeShape = async (
     const shape = findSingleShape(params.shapeId);
     
     if (!shape) {
-      // Provide helpful error with available shapes
+      // Provide helpful error with available shapes (using color names)
       const availableShapes = currentCanvasObjects.map(obj => 
-        `${obj.color} ${obj.type}`
+        `${hexToColorName(obj.color)} ${obj.type}`
       ).join(', ');
       
       return {
@@ -480,9 +667,9 @@ export const aiRotateShape = async (
     const shape = findSingleShape(params.shapeId);
     
     if (!shape) {
-      // Provide helpful error with available shapes
+      // Provide helpful error with available shapes (using color names)
       const availableShapes = currentCanvasObjects.map(obj => 
-        `${obj.color} ${obj.type}`
+        `${hexToColorName(obj.color)} ${obj.type}`
       ).join(', ');
       
       return {
@@ -528,9 +715,9 @@ export const aiDeleteShape = async (
     const shape = findSingleShape(params.shapeId);
     
     if (!shape) {
-      // Provide helpful error with available shapes
+      // Provide helpful error with available shapes (using color names)
       const availableShapes = currentCanvasObjects.map(obj => 
-        `${obj.color} ${obj.type}`
+        `${hexToColorName(obj.color)} ${obj.type}`
       ).join(', ');
       
       return {

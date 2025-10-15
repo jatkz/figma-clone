@@ -78,21 +78,21 @@ export const AI_TOOLS: AITool[] = [
   },
   {
     name: 'moveShape',
-    description: 'Move an existing shape to a new position. Examples: "Move the blue rectangle to 100, 200", "Move the text to the center"',
+    description: 'Move an existing shape to a new position. Object finding is AUTOMATIC - you can reference shapes by description (e.g., "black rectangle", "red circle", "the text") and the system will find them. Use this tool directly without checking canvas state first. Examples: "Move the blue rectangle to 100, 200", "Move the black rectangle to the center", "Move the text to 1000, 500"',
     parameters: {
       type: 'object',
       properties: {
         shapeId: {
           type: 'string',
-          description: 'ID of the shape to move, or description like "blue rectangle" or "the text"'
+          description: 'Description of the shape to move (e.g., "blue rectangle", "red circle", "black rectangle", "the text"). The system automatically finds matching objects.'
         },
         x: {
           type: 'number',
-          description: 'New X coordinate (0-5000). Canvas center is at 2500.'
+          description: 'New X coordinate (0-5000). Canvas center is at 2500. Use "center" for 2500.'
         },
         y: {
           type: 'number',
-          description: 'New Y coordinate (0-5000). Canvas center is at 2500.'
+          description: 'New Y coordinate (0-5000). Canvas center is at 2500. Use "center" for 2500.'
         }
       },
       required: ['shapeId', 'x', 'y']
@@ -100,13 +100,13 @@ export const AI_TOOLS: AITool[] = [
   },
   {
     name: 'resizeShape',
-    description: 'Resize an existing shape. Examples: "Make the circle twice as big", "Resize the rectangle to 300x200"',
+    description: 'Resize an existing shape. Object finding is AUTOMATIC - reference shapes by description. Use this tool directly without checking canvas state first. Examples: "Make the circle twice as big", "Resize the black rectangle to 300x200", "Make the red circle bigger"',
     parameters: {
       type: 'object',
       properties: {
         shapeId: {
           type: 'string',
-          description: 'ID of the shape to resize, or description like "blue rectangle"'
+          description: 'Description of the shape to resize (e.g., "blue rectangle", "red circle", "the text"). The system automatically finds matching objects.'
         },
         width: {
           type: 'number',
@@ -122,17 +122,17 @@ export const AI_TOOLS: AITool[] = [
   },
   {
     name: 'rotateShape',
-    description: 'Rotate an existing shape. Examples: "Rotate the text 45 degrees", "Turn the rectangle 90 degrees"',
+    description: 'Rotate an existing shape to a specific angle. Object finding is AUTOMATIC - reference shapes by description. Use this tool directly without checking canvas state first. IMPORTANT: Use 0 degrees to reset rotation to normal. Examples: "Rotate the text 45 degrees", "Turn the black rectangle 90 degrees", "Rotate the red circle 180 degrees", "Rotate the purple rectangle to 0 degrees" (reset to normal), "Set rotation to 0" (reset)',
     parameters: {
       type: 'object',
       properties: {
         shapeId: {
           type: 'string',
-          description: 'ID of the shape to rotate, or description like "the text"'
+          description: 'Description of the shape to rotate (e.g., "the text", "blue rectangle", "red circle"). The system automatically finds matching objects.'
         },
         degrees: {
           type: 'number',
-          description: 'Rotation angle in degrees (0-360)'
+          description: 'Absolute rotation angle in degrees (0-360). Use 0 to reset to normal orientation, 90 for quarter turn, 180 for upside down, 270 for three-quarter turn.'
         }
       },
       required: ['shapeId', 'degrees']
@@ -140,13 +140,13 @@ export const AI_TOOLS: AITool[] = [
   },
   {
     name: 'deleteShape',
-    description: 'Delete a shape from the canvas. Examples: "Delete the red circle", "Remove the text"',
+    description: 'Delete a shape from the canvas. Object finding is AUTOMATIC - reference shapes by description. Use this tool directly without checking canvas state first. Examples: "Delete the red circle", "Remove the black rectangle", "Delete the text"',
     parameters: {
       type: 'object',
       properties: {
         shapeId: {
           type: 'string',
-          description: 'ID of the shape to delete, or description like "red circle"'
+          description: 'Description of the shape to delete (e.g., "red circle", "black rectangle", "the text"). The system automatically finds matching objects.'
         }
       },
       required: ['shapeId']
@@ -154,7 +154,7 @@ export const AI_TOOLS: AITool[] = [
   },
   {
     name: 'getCanvasState',
-    description: 'Get the current state of all objects on the canvas',
+    description: 'Get the current state of all objects on the canvas. ONLY use this when the user explicitly asks to see what\'s on the canvas (e.g., "what shapes are there?", "list all objects", "show me the canvas"). DO NOT use this before manipulation commands like move, resize, or delete - those operations find objects automatically.',
     parameters: {
       type: 'object',
       properties: {},
