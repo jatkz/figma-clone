@@ -99,13 +99,13 @@ Build an AI Canvas Agent that manipulates the collaborative canvas through natur
 - [x] Add keyboard shortcuts (Enter to send)
 
 ### 9.2 Chat Integration
-- [ ] Add AI chat toggle button to header
-- [ ] Integrate chat panel with App.tsx layout
-- [ ] Implement message state management
-- [ ] Add chat history persistence (localStorage)
-- [ ] Handle concurrent AI requests
-- [ ] Add error message display
-- [ ] Implement message timestamps
+- [x] Add AI chat toggle button to header
+- [x] Integrate chat panel with App.tsx layout
+- [x] Implement message state management
+- [x] Add chat history persistence (localStorage)
+- [x] Handle concurrent AI requests
+- [x] Add error message display
+- [x] Implement message timestamps
 
 ### 9.3 AI Response Processing
 - [ ] Parse AI function calls from responses

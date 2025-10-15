@@ -5,6 +5,7 @@ import Canvas from './components/Canvas';
 import ToolPanel, { useToolState } from './components/ToolPanel';
 import PresenceIndicator from './components/PresenceIndicator';
 import UserList from './components/UserList';
+import AIChat from './components/AIChat';
 import { ToastProvider, useToastContext } from './contexts/ToastContext';
 import { ToastManager } from './components/Toast';
 import { useCanvas } from './hooks/useCanvas';
@@ -16,6 +17,7 @@ import './App.css';
 function AppContent() {
   const { activeTool, setActiveTool } = useToolState('select');
   const [showUserList, setShowUserList] = useState(false);
+  const [showAIChat, setShowAIChat] = useState(false);
   const { toasts, removeToast } = useToastContext();
   const { user } = useAuth();
   const toastFunction = createToastFunction(useToastContext());
@@ -52,6 +54,18 @@ function AppContent() {
                     }`}
                   >
                     👥 Users
+                  </button>
+
+                  {/* AI Chat Toggle */}
+                  <button
+                    onClick={() => setShowAIChat(!showAIChat)}
+                    className={`px-3 py-1 text-sm rounded-lg font-medium transition-colors flex-shrink-0 ${
+                      showAIChat 
+                        ? 'bg-purple-600 hover:bg-purple-700 text-white' 
+                        : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                    }`}
+                  >
+                    🤖 AI Chat
                   </button>
 
                   {/* Clear Canvas Button */}
@@ -124,11 +138,51 @@ function AppContent() {
           </div>
         )}
 
+        {/* AI Chat Sidebar - Fixed Position (left side) */}
+        {showAIChat && (
+          <div 
+            className="fixed top-0 left-0 h-full w-96 bg-white shadow-xl border-r border-gray-200 z-50 transform transition-transform duration-300 ease-in-out"
+            style={{ 
+              transform: showAIChat ? 'translateX(0)' : 'translateX(-100%)',
+              paddingTop: '4rem' // Account for header height
+            }}
+          >
+            <div className="h-full p-4 overflow-hidden flex flex-col">
+              {/* Close button */}
+              <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-200 flex-shrink-0">
+                <h2 className="text-lg font-semibold text-gray-900">AI Canvas Agent</h2>
+                <button
+                  onClick={() => setShowAIChat(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+                  aria-label="Close AI chat"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              {/* AI Chat Content */}
+              <div className="flex-1 min-h-0">
+                <AIChat />
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Backdrop overlay when sidebar is open */}
         {showUserList && (
           <div 
             className="fixed inset-0 bg-black bg-opacity-25 z-40"
             onClick={() => setShowUserList(false)}
+          />
+        )}
+        
+        {/* Backdrop overlay for AI chat */}
+        {showAIChat && (
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-25 z-40"
+            onClick={() => setShowAIChat(false)}
           />
         )}
       </ProtectedRoute>

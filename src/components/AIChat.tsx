@@ -15,6 +15,9 @@ interface Message {
   isError?: boolean;
 }
 
+const STORAGE_KEY = 'aiChatHistory';
+const MAX_STORED_MESSAGES = 50; // Limit stored messages to prevent localStorage overflow
+
 const AIChat: React.FC<AIChatProps> = ({ className = '' }) => {
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -23,6 +26,31 @@ const AIChat: React.FC<AIChatProps> = ({ className = '' }) => {
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const isProcessingRef = useRef(false); // Prevent concurrent requests
+
+  // Load chat history from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        setMessages(parsed);
+      }
+    } catch (error) {
+      console.error('Failed to load chat history:', error);
+    }
+  }, []);
+
+  // Save chat history to localStorage whenever messages change
+  useEffect(() => {
+    try {
+      // Keep only the last MAX_STORED_MESSAGES messages
+      const messagesToStore = messages.slice(-MAX_STORED_MESSAGES);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(messagesToStore));
+    } catch (error) {
+      console.error('Failed to save chat history:', error);
+    }
+  }, [messages]);
 
   // Auto-scroll to bottom when new messages arrive
   const scrollToBottom = () => {
@@ -40,7 +68,10 @@ const AIChat: React.FC<AIChatProps> = ({ className = '' }) => {
 
   // Handle sending message
   const handleSend = async () => {
-    if (!inputValue.trim() || !user?.id || isLoading) return;
+    if (!inputValue.trim() || !user?.id || isLoading || isProcessingRef.current) return;
+
+    // Prevent concurrent requests
+    isProcessingRef.current = true;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -93,6 +124,7 @@ const AIChat: React.FC<AIChatProps> = ({ className = '' }) => {
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+      isProcessingRef.current = false; // Allow new requests
     }
   };
 
@@ -108,6 +140,7 @@ const AIChat: React.FC<AIChatProps> = ({ className = '' }) => {
   const handleClear = () => {
     if (window.confirm('Clear chat history?')) {
       setMessages([]);
+      localStorage.removeItem(STORAGE_KEY);
     }
   };
 
