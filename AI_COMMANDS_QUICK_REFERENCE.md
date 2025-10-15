@@ -210,14 +210,15 @@ Pan the canvas or check coordinates. Canvas is 5000x5000, viewport may be elsewh
 
 ## Next Phase Features (Not Yet Available)
 
-Phase 9 will add:
-- AI Chat UI (no more console!)
-- Message history
-- Typing indicators
+Phase 9.2 will add:
+- AI Chat toggle button in header
+- Integrated chat panel
+- No more console testing!
 
 ---
 
 **Phase 8.1 Status: ✅ Complete**  
 **Phase 8.2 Status: ✅ Complete**  
-**Phase 8.3 Status: ✅ Complete**
+**Phase 8.3 Status: ✅ Complete**  
+**Phase 9.1 Status: ✅ Complete (UI component ready)**
 

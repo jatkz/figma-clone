@@ -90,13 +90,13 @@ Build an AI Canvas Agent that manipulates the collaborative canvas through natur
 ## Phase 9: AI Chat Interface (Hours 41-48)
 
 ### 9.1 Chat UI Components
-- [ ] Create `src/components/AIChat.tsx`
-- [ ] Design floating chat panel (similar to UserList)
-- [ ] Add message history display
-- [ ] Create message input with send button
-- [ ] Add typing indicators and loading states
-- [ ] Style with Tailwind for consistency
-- [ ] Add keyboard shortcuts (Enter to send)
+- [x] Create `src/components/AIChat.tsx`
+- [x] Design floating chat panel (similar to UserList)
+- [x] Add message history display
+- [x] Create message input with send button
+- [x] Add typing indicators and loading states
+- [x] Style with Tailwind for consistency
+- [x] Add keyboard shortcuts (Enter to send)
 
 ### 9.2 Chat Integration
 - [ ] Add AI chat toggle button to header
