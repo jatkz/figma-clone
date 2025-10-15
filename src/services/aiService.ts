@@ -252,6 +252,51 @@ EXAMPLES - Complex Multi-Step Operations:
    6. createShape (text "Learn More" on button)
    7. arrangeShapes (arrange all vertically within card bounds)
 
+✅ User: "Create a hero section" →
+   1. createShape (large rectangle for hero background, ~800x400px)
+   2. createShape (text "Welcome to Our Product" - main headline, large font ~32px)
+   3. createShape (text "The best solution for your needs" - subheading, ~20px)
+   4. createShape (rectangle for CTA button, ~250x60px, blue)
+   5. createShape (text "Get Started" on button, white)
+   6. arrangeShapes (center all elements vertically with 25-30px spacing)
+
+✅ User: "Create a footer" →
+   1. createShape (wide rectangle for footer background, spanning full width)
+   2. createShape (text "Company" - section heading)
+   3. createShape (text "About Us" - link)
+   4. createShape (text "Contact" - link)
+   5. createShape (text "Resources" - section heading)
+   6. createShape (text "Docs" - link)
+   7. createShape (text "© 2025 Company Name" - copyright)
+   8. arrangeShapes (create 3 horizontal sections/columns)
+
+✅ User: "Create a sidebar menu" →
+   1. createShape (vertical rectangle for sidebar background, ~250x600px)
+   2. createShape (text "Dashboard")
+   3. createShape (text "Profile")
+   4. createShape (text "Settings")
+   5. createShape (text "Logout")
+   6. arrangeShapes (stack menu items vertically with 20px spacing)
+
+✅ User: "Create a feature grid with 3 features" →
+   1. createShape (text "Feature 1" - title)
+   2. createShape (text "Description for feature 1")
+   3. createShape (text "Feature 2" - title)
+   4. createShape (text "Description for feature 2")
+   5. createShape (text "Feature 3" - title)
+   6. createShape (text "Description for feature 3")
+   7. createGrid or arrangeShapes (arrange in 3-column grid layout)
+
+✅ User: "Create a modal dialog" →
+   1. createShape (rectangle for modal background/container, ~500x300px, white with shadow)
+   2. createShape (text "Confirm Action" - modal title)
+   3. createShape (text "Are you sure you want to proceed?" - message)
+   4. createShape (rectangle for Cancel button)
+   5. createShape (text "Cancel" on button)
+   6. createShape (rectangle for Confirm button, blue)
+   7. createShape (text "Confirm" on button)
+   8. arrangeShapes (title at top, message middle, buttons at bottom horizontally)
+
 Use the available tools to execute operations immediately. Break down complex requests into multiple createShape and arrangeShapes calls.
 
 Be helpful, creative, and proactive. For UI elements, use:
@@ -260,7 +305,12 @@ Be helpful, creative, and proactive. For UI elements, use:
 - Light gray (#E0E0E0) for input backgrounds
 - Blue (#3498DB) for primary buttons
 - Standard button size: 200x50px
-- Standard input field: 300x40px`,
+- Standard input field: 300x40px
+- Hero sections: Large backgrounds (800x400px), large headlines (32px), CTA buttons (250x60px)
+- Footers: Wide backgrounds spanning canvas, 3-column layout typical
+- Sidebars: Vertical (~250px wide), menu items stacked with 20px spacing
+- Modals: Centered containers (~500x300px), buttons at bottom
+- Feature grids: 3-column layouts with title + description per feature`,
     };
 
     // Prepare messages

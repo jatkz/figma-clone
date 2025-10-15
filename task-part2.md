@@ -133,17 +133,17 @@ Build an AI Canvas Agent that manipulates the collaborative canvas through natur
 - [x] Handle complex multi-object creation
 
 ### 10.2 Navigation & UI Elements
-- [ ] Implement "Create a navigation bar":
+7- [x] Implement "Create a navigation bar":
   - Background rectangle
   - 4 menu item buttons (Home, About, Services, Contact)
   - Proper spacing and alignment
-- [ ] Implement "Create a card layout":
+- [x] Implement "Create a card layout":
   - Card background rectangle
   - Title text at top
   - Image placeholder rectangle
   - Description text below
   - Action button at bottom
-- [ ] Add component templating system
+- [x] Add component templating system (pattern library in system prompt)
 
 ### 10.3 Advanced Layout Operations
 - [ ] Implement smart object grouping
