@@ -1,13 +1,9 @@
 import React, { useState } from 'react';
+import type { ExportOptions } from '../utils/canvasExport';
 
 export type ExportMode = 'viewport' | 'entire' | 'selected';
 export type ExportScale = 1 | 2 | 4;
-
-export interface ExportOptions {
-  mode: ExportMode;
-  scale: ExportScale;
-  includeBackground: boolean;
-}
+export type ExportFormat = 'png' | 'svg';
 
 interface ExportDialogProps {
   isOpen: boolean;
@@ -22,6 +18,7 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
   onExport, 
   hasSelection 
 }) => {
+  const [format, setFormat] = useState<ExportFormat>('png');
   const [mode, setMode] = useState<ExportMode>('viewport');
   const [scale, setScale] = useState<ExportScale>(2);
   const [includeBackground, setIncludeBackground] = useState(true);
@@ -33,7 +30,7 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
     setError(null);
     
     try {
-      await onExport({ mode, scale, includeBackground });
+      await onExport({ format, mode, scale, includeBackground });
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Export failed');
@@ -92,6 +89,40 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
 
           {/* Content */}
           <div className="px-6 py-4 space-y-6">
+            {/* Format Selection */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-3">
+                Export Format
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setFormat('png')}
+                  disabled={isExporting}
+                  className={`py-2 px-4 rounded-lg font-medium transition-colors border-2 ${
+                    format === 'png'
+                      ? 'bg-blue-100 border-blue-500 text-blue-700'
+                      : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  PNG (Raster)
+                </button>
+                <button
+                  onClick={() => setFormat('svg')}
+                  disabled={isExporting}
+                  className={`py-2 px-4 rounded-lg font-medium transition-colors border-2 ${
+                    format === 'svg'
+                      ? 'bg-blue-100 border-blue-500 text-blue-700'
+                      : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  SVG (Vector)
+                </button>
+              </div>
+              <p className="mt-2 text-xs text-gray-500">
+                {format === 'png' ? 'PNG is best for photos and complex graphics' : 'SVG is perfect for scalable graphics and logos'}
+              </p>
+            </div>
+
             {/* Export Mode */}
             <div>
               <label className="block text-sm font-semibold text-gray-900 mb-3">
@@ -153,31 +184,33 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
               </div>
             </div>
 
-            {/* Scale */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-3">
-                Resolution Scale
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                {[1, 2, 4].map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => setScale(s as ExportScale)}
-                    disabled={isExporting}
-                    className={`py-2 px-4 rounded-lg font-medium transition-colors border-2 ${
-                      scale === s
-                        ? 'bg-blue-100 border-blue-500 text-blue-700'
-                        : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-                    } disabled:opacity-50 disabled:cursor-not-allowed`}
-                  >
-                    {s}x
-                  </button>
-                ))}
+            {/* Scale (PNG only) */}
+            {format === 'png' && (
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-3">
+                  Resolution Scale
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[1, 2, 4].map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => setScale(s as ExportScale)}
+                      disabled={isExporting}
+                      className={`py-2 px-4 rounded-lg font-medium transition-colors border-2 ${
+                        scale === s
+                          ? 'bg-blue-100 border-blue-500 text-blue-700'
+                          : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    >
+                      {s}x
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs text-gray-500">
+                  Higher scales produce larger, higher quality images
+                </p>
               </div>
-              <p className="mt-2 text-xs text-gray-500">
-                Higher scales produce larger, higher quality images
-              </p>
-            </div>
+            )}
 
             {/* Background */}
             <div>
@@ -233,7 +266,7 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
-                  Export PNG
+                  Export {format.toUpperCase()}
                 </>
               )}
             </button>

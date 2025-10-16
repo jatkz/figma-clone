@@ -7,7 +7,8 @@ import PresenceIndicator from './components/PresenceIndicator';
 import UserList from './components/UserList';
 import AIChat from './components/AIChat';
 import ShortcutsPanel from './components/ShortcutsPanel';
-import ExportDialog, { type ExportOptions } from './components/ExportDialog';
+import ExportDialog from './components/ExportDialog';
+import type { ExportOptions } from './utils/canvasExport';
 import { ToastProvider, useToastContext } from './contexts/ToastContext';
 import { ToastManager } from './components/Toast';
 import { useCanvas } from './hooks/useCanvas';
@@ -219,7 +220,7 @@ function AppContent() {
   // Handle canvas export
   const handleExport = async (options: ExportOptions) => {
     try {
-      await canvasRef.current?.exportToPNG(options);
+      await canvasRef.current?.exportCanvas(options);
     } catch (error) {
       console.error('Export error:', error);
       throw error;

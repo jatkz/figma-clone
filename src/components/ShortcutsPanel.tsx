@@ -38,7 +38,7 @@ const shortcuts: Shortcut[] = [
   { keys: ['Ctrl', '+'], description: 'Zoom in', category: 'Canvas' },
   { keys: ['Ctrl', '-'], description: 'Zoom out', category: 'Canvas' },
   { keys: ['Space', 'Drag'], description: 'Pan canvas', category: 'Canvas' },
-  { keys: ['Ctrl', 'Shift', 'E'], description: 'Export canvas (coming soon)', category: 'Canvas' },
+  { keys: ['Ctrl', 'Shift', 'E'], description: 'Export canvas (PNG/SVG)', category: 'Canvas' },
   
   // General
   { keys: ['?'], description: 'Show keyboard shortcuts', category: 'General' },

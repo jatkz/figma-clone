@@ -26,6 +26,7 @@ import { useCanvas } from '../hooks/useCanvas';
 import { useToastContext, createToastFunction } from '../contexts/ToastContext';
 import { updateCursor, subscribeToCursors, type CursorData } from '../services/canvasService';
 import { initializeAICanvasState, cleanupAICanvasState } from '../services/aiCanvasService';
+import { exportToSVG, exportToPNG, type ExportOptions } from '../utils/canvasExport';
 import Cursor from './Cursor';
 
 // Throttle utility for cursor updates
@@ -59,12 +60,6 @@ interface CanvasProps {
   onSelectionChange?: (hasSelection: boolean) => void;
 }
 
-export interface ExportOptions {
-  mode: 'viewport' | 'entire' | 'selected';
-  scale: 1 | 2 | 4;
-  includeBackground: boolean;
-}
-
 export interface CanvasRef {
   duplicate: () => void;
   deleteSelected: () => Promise<void>;
@@ -81,7 +76,7 @@ export interface CanvasRef {
   zoomIn: () => void;
   zoomOut: () => void;
   resetZoom: () => void;
-  exportToPNG: (options: ExportOptions) => Promise<void>;
+  exportCanvas: (options: ExportOptions) => Promise<void>;
 }
 
 const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChange }, ref) => {
@@ -639,127 +634,6 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     setSelectedObjectIds(locked);
   }, [user?.id, objects, selectedObjectIds, acquireMultipleLocks, releaseMultipleLocks]);
 
-  // Export canvas to PNG
-  const handleExportToPNG = useCallback(async (options: ExportOptions) => {
-    const stage = stageRef.current;
-    if (!stage) {
-      throw new Error('Canvas not ready for export');
-    }
-
-    try {
-      let dataURL: string;
-      
-      if (options.mode === 'viewport') {
-        // Export current viewport
-        dataURL = stage.toDataURL({
-          pixelRatio: options.scale,
-          mimeType: 'image/png',
-        });
-      } else if (options.mode === 'entire') {
-        // Export entire canvas (5000x5000)
-        // Create a temporary clone of the stage to export
-        const tempStage = stage.clone();
-        tempStage.setAttrs({
-          x: 0,
-          y: 0,
-          scaleX: 1,
-          scaleY: 1,
-          width: 5000,
-          height: 5000,
-        });
-        
-        dataURL = tempStage.toDataURL({
-          pixelRatio: options.scale,
-          mimeType: 'image/png',
-        });
-        
-        tempStage.destroy();
-      } else if (options.mode === 'selected') {
-        // Export selected objects only
-        if (selectedObjectIds.length === 0) {
-          throw new Error('No objects selected');
-        }
-        
-        // Find the bounding box of all selected objects
-        const selectedObjects = objects.filter(obj => selectedObjectIds.includes(obj.id));
-        if (selectedObjects.length === 0) {
-          throw new Error('Selected objects not found');
-        }
-        
-        let minX = Infinity;
-        let minY = Infinity;
-        let maxX = -Infinity;
-        let maxY = -Infinity;
-        
-        selectedObjects.forEach(obj => {
-          const width = 'width' in obj && obj.width ? obj.width : ('radius' in obj && obj.radius ? obj.radius * 2 : 100);
-          const height = 'height' in obj && obj.height ? obj.height : ('radius' in obj && obj.radius ? obj.radius * 2 : 100);
-          
-          minX = Math.min(minX, obj.x);
-          minY = Math.min(minY, obj.y);
-          maxX = Math.max(maxX, obj.x + width);
-          maxY = Math.max(maxY, obj.y + height);
-        });
-        
-        const padding = 20;
-        const exportWidth = maxX - minX + padding * 2;
-        const exportHeight = maxY - minY + padding * 2;
-        
-        // Clone the stage and filter to only selected objects
-        const tempStage = stage.clone();
-        const layers = tempStage.getLayers();
-        
-        layers.forEach(layer => {
-          const children = layer.getChildren();
-          children.forEach(child => {
-            // Remove objects that are not selected
-            const id = child.id();
-            if (id && !selectedObjectIds.includes(id)) {
-              child.destroy();
-            }
-          });
-        });
-        
-        tempStage.setAttrs({
-          x: -(minX - padding),
-          y: -(minY - padding),
-          scaleX: 1,
-          scaleY: 1,
-          width: exportWidth,
-          height: exportHeight,
-        });
-        
-        dataURL = tempStage.toDataURL({
-          pixelRatio: options.scale,
-          mimeType: 'image/png',
-        });
-        
-        tempStage.destroy();
-      } else {
-        throw new Error('Invalid export mode');
-      }
-      
-      // Convert data URL to blob and download
-      const response = await fetch(dataURL);
-      const blob = await response.blob();
-      
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-      link.href = url;
-      link.download = `canvas-export-${timestamp}.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      
-      toastFunction('Canvas exported successfully!', 'success', 2000);
-    } catch (error) {
-      console.error('Export failed:', error);
-      throw error;
-    }
-  }, [stageRef, viewport, selectedObjectIds, objects, toastFunction]);
-
   // Expose functions to parent via ref
   useImperativeHandle(ref, () => ({
     duplicate: handleDuplicateObject,
@@ -797,8 +671,32 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
       setViewport(prev => ({ ...prev, scale: 1 }));
       toastFunction('Zoom reset to 100%', 'success', 1500);
     },
-    exportToPNG: handleExportToPNG
-  }), [handleDuplicateObject, handleDeleteSelected, handleClearSelection, handleSelectAll, handleSelectNext, handleSelectPrevious, rotateBy, resetRotation, selectedObjectIds, editingTextId, toastFunction, viewport, handleExportToPNG]);
+    exportCanvas: async (options: ExportOptions) => {
+      const stage = stageRef.current;
+      if (!stage) {
+        throw new Error('Canvas not ready for export');
+      }
+
+      const params = {
+        stage,
+        objects,
+        viewport,
+        selectedObjectIds
+      };
+
+      try {
+        if (options.format === 'svg') {
+          await exportToSVG(params, options);
+        } else {
+          await exportToPNG(params, options);
+        }
+        toastFunction('Canvas exported successfully!', 'success', 2000);
+      } catch (error) {
+        console.error('Export failed:', error);
+        throw error;
+      }
+    }
+  }), [handleDuplicateObject, handleDeleteSelected, handleClearSelection, handleSelectAll, handleSelectNext, handleSelectPrevious, rotateBy, resetRotation, selectedObjectIds, editingTextId, toastFunction, viewport, objects, stageRef]);
 
   // Track Space key for pan mode (Space+Drag to pan)
   useEffect(() => {
