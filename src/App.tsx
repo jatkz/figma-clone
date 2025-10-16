@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import ProtectedRoute from './components/ProtectedRoute';
 import LogoutButton from './components/LogoutButton';
 import Canvas, { type CanvasRef } from './components/Canvas';
@@ -25,6 +25,89 @@ function AppContent() {
   const canvasRef = useRef<CanvasRef>(null);
   const [hasSelection, setHasSelection] = useState(false);
 
+  // Consolidated keyboard shortcuts handler
+  useEffect(() => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing in input fields
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+
+      // Don't trigger shortcuts during text editing
+      if (canvasRef.current?.isTextEditing()) {
+        return;
+      }
+
+      // Tool shortcuts (V, R, C, T)
+      switch (e.key.toLowerCase()) {
+        case 'v':
+          e.preventDefault();
+          setActiveTool('select');
+          return;
+        case 'r':
+          e.preventDefault();
+          setActiveTool('rectangle');
+          return;
+        case 'c':
+          e.preventDefault();
+          setActiveTool('circle');
+          return;
+        case 't':
+          e.preventDefault();
+          setActiveTool('text');
+          return;
+      }
+
+      // Duplicate: Ctrl/Cmd+D
+      if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+        e.preventDefault();
+        canvasRef.current?.duplicate();
+        return;
+      }
+
+      // Reset rotation: Ctrl/Cmd+Shift+R (only for single selection)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'r' || e.key === 'R')) {
+        e.preventDefault();
+        canvasRef.current?.resetRotation();
+        return;
+      }
+
+      // Rotate 90° clockwise: ] key (only for single selection)
+      if (e.key === ']' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        canvasRef.current?.rotateBy(90);
+        return;
+      }
+
+      // Rotate 90° counter-clockwise: [ key (only for single selection)
+      if (e.key === '[' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        canvasRef.current?.rotateBy(-90);
+        return;
+      }
+
+      // Delete: Delete or Backspace key
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        await canvasRef.current?.deleteSelected();
+        return;
+      }
+
+      // Escape: Clear selection and switch to select tool
+      if (e.key === 'Escape') {
+        await canvasRef.current?.clearSelection();
+        setActiveTool('select');
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [setActiveTool]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">

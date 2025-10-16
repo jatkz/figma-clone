@@ -353,15 +353,15 @@ This document outlines the implementation plan for core canvas manipulation feat
 
 ## Phase 14: Keyboard Shortcuts (Tier 1)
 
-### 14.1 Tool Shortcuts
-- [ ] Implement keyboard shortcuts:
+### 14.1 Tool Shortcuts ✅ COMPLETE
+- [x] Implement keyboard shortcuts:
   - `V` or `Esc`: Select tool
   - `R`: Rectangle tool
   - `C`: Circle tool
   - `T`: Text tool
-- [ ] Show shortcuts in toolbar tooltips
-- [ ] Disable shortcuts when typing in text fields
-- [ ] Visual feedback: Highlight active tool on keypress
+- [x] Show shortcuts in toolbar tooltips
+- [x] Disable shortcuts when typing in text fields
+- [x] Visual feedback: Highlight active tool on keypress
 
 ### 14.2 Object Manipulation Shortcuts
 - [ ] Selection shortcuts:

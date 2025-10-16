@@ -61,6 +61,12 @@ interface CanvasProps {
 
 export interface CanvasRef {
   duplicate: () => void;
+  deleteSelected: () => Promise<void>;
+  clearSelection: () => Promise<void>;
+  rotateBy: (degrees: number) => void;
+  resetRotation: () => void;
+  isTextEditing: () => boolean;
+  hasSelection: () => boolean;
 }
 
 const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChange }, ref) => {
@@ -531,97 +537,55 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     }
   }, [user?.id, selectedObjectIds, objects, createObjectOptimistic, releaseMultipleLocks, acquireMultipleLocks, toastFunction]);
 
-  // Expose duplicate function to parent via ref
+  // Handle delete selected objects
+  const handleDeleteSelected = useCallback(async () => {
+    if (selectedObjectIds.length === 0) {
+      return;
+    }
+
+    let successCount = 0;
+    for (const objectId of selectedObjectIds) {
+      const success = await deleteObjectOptimistic(objectId);
+      if (success) {
+        successCount++;
+      }
+    }
+    
+    // Release all locks
+    await releaseMultipleLocks(selectedObjectIds);
+    setSelectedObjectIds([]);
+    
+    const count = selectedObjectIds.length;
+    toastFunction(`${successCount} of ${count} object${count > 1 ? 's' : ''} deleted`, 'success', 1500);
+  }, [selectedObjectIds, deleteObjectOptimistic, releaseMultipleLocks, toastFunction]);
+
+  // Handle clear selection
+  const handleClearSelection = useCallback(async () => {
+    if (selectedObjectIds.length > 0) {
+      await releaseMultipleLocks(selectedObjectIds);
+      setSelectedObjectIds([]);
+    }
+  }, [selectedObjectIds, releaseMultipleLocks]);
+
+  // Expose functions to parent via ref
   useImperativeHandle(ref, () => ({
-    duplicate: handleDuplicateObject
-  }), [handleDuplicateObject]);
-
-  // Keyboard event handler (delete, duplicate, rotate)
-  useEffect(() => {
-    const handleKeyDown = async (e: KeyboardEvent) => {
-      // Disable all canvas shortcuts during text editing
-      if (editingTextId) {
-        return;
+    duplicate: handleDuplicateObject,
+    deleteSelected: handleDeleteSelected,
+    clearSelection: handleClearSelection,
+    rotateBy: (degrees: number) => {
+      if (selectedObjectIds.length === 1) {
+        rotateBy(degrees);
       }
-
-      // Disable canvas shortcuts when typing in input fields (AI chat, etc.)
-      const target = e.target as HTMLElement;
-      if (
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.isContentEditable
-      ) {
-        return;
+    },
+    resetRotation: () => {
+      if (selectedObjectIds.length === 1) {
+        resetRotation();
+        toastFunction('Rotation reset to 0°', 'success', 1500);
       }
-
-      // Duplicate: Ctrl/Cmd+D
-      if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
-        e.preventDefault(); // Prevent browser bookmark dialog
-        await handleDuplicateObject();
-        return;
-      }
-
-      // Reset rotation: Ctrl/Cmd+Shift+R (only for single selection)
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'r' || e.key === 'R')) {
-        e.preventDefault();
-        if (selectedObjectIds.length === 1) {
-          resetRotation();
-          toastFunction('Rotation reset to 0°', 'success', 1500);
-        }
-        return;
-      }
-
-      // Rotate 90° clockwise: ] key (only for single selection)
-      if (e.key === ']' && !e.ctrlKey && !e.metaKey) {
-        e.preventDefault();
-        if (selectedObjectIds.length === 1) {
-          rotateBy(90);
-        }
-        return;
-      }
-
-      // Rotate 90° counter-clockwise: [ key (only for single selection)
-      if (e.key === '[' && !e.ctrlKey && !e.metaKey) {
-        e.preventDefault();
-        if (selectedObjectIds.length === 1) {
-          rotateBy(-90);
-        }
-        return;
-      }
-
-      // Delete: Delete or Backspace key (works on all selected objects)
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (selectedObjectIds.length > 0) {
-          // Delete all selected objects with Firestore sync
-          let successCount = 0;
-          for (const objectId of selectedObjectIds) {
-            const success = await deleteObjectOptimistic(objectId);
-            if (success) {
-              successCount++;
-            }
-          }
-          
-          // Release all locks
-          await releaseMultipleLocks(selectedObjectIds);
-          setSelectedObjectIds([]);
-          
-          const count = selectedObjectIds.length;
-          toastFunction(`${successCount} of ${count} object${count > 1 ? 's' : ''} deleted`, 'success', 1500);
-        }
-      }
-
-      // Escape: Clear selection
-      if (e.key === 'Escape') {
-        if (selectedObjectIds.length > 0) {
-          await releaseMultipleLocks(selectedObjectIds);
-          setSelectedObjectIds([]);
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedObjectIds, deleteObjectOptimistic, releaseMultipleLocks, handleDuplicateObject, rotateBy, resetRotation, toastFunction, editingTextId]);
+    },
+    isTextEditing: () => editingTextId !== null,
+    hasSelection: () => selectedObjectIds.length > 0
+  }), [handleDuplicateObject, handleDeleteSelected, handleClearSelection, rotateBy, resetRotation, selectedObjectIds, editingTextId, toastFunction]);
 
   // Handle rectangle drag events (supports group movement for multi-select)
   const handleRectangleDragStart = useCallback((objectId: string) => {
