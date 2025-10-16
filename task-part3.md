@@ -208,33 +208,33 @@ This document outlines the implementation plan for core canvas manipulation feat
 - [ ] Test: Resize with rotation applied
 - [ ] Test: Resize constraints work correctly
 
-### 11.3 Rotate Functionality (UI Controls)
-- [ ] Add rotation handle above selected object
-- [ ] Rotation handle UI:
+### 11.3 Rotate Functionality (UI Controls) ✅ **COMPLETE**
+- [x] Add rotation handle above selected object
+- [x] Rotation handle UI:
   - Small circle connected by line to object
   - Position 30px above top center of object
   - Cursor changes to rotation icon on hover
-- [ ] Implement rotation interaction:
+- [x] Implement rotation interaction:
   - Click and drag rotation handle
   - Calculate angle from object center to cursor
   - Snap to 15° increments when Shift key held
   - Show current rotation angle tooltip during drag
-- [ ] Visual feedback:
+- [x] Visual feedback:
   - Rotate preview in real-time
   - Show angle indicator (e.g., "45°")
-- [ ] Keyboard shortcuts:
+- [x] Keyboard shortcuts:
   - Rotate 90° clockwise: ] key
   - Rotate 90° counter-clockwise: [ key
   - Reset rotation to 0°: Ctrl/Cmd+Shift+R
-- [ ] Rotation for all object types:
+- [x] Rotation for all object types:
   - Rectangles: Rotate around center
   - Circles: Rotate around center (visual only for circular shapes)
   - Text: Rotate text with bounding box
-- [ ] Real-time sync (throttled 50ms during drag)
-- [ ] Lock required to rotate
-- [ ] Test: Rotate from 0° to 360°
-- [ ] Test: Rotation with resize handles
-- [ ] Test: Snap rotation with Shift key
+- [x] Real-time sync (throttled 50ms during drag)
+- [x] Lock required to rotate
+- [x] Test: Rotate from 0° to 360°
+- [x] Test: Rotation with resize handles
+- [x] Test: Snap rotation with Shift key
 
 ---
 

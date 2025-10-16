@@ -13,7 +13,9 @@ import Rectangle from './Rectangle';
 import CircleComponent from './Circle';
 import TextObjectComponent from './TextObject';
 import ResizeHandles from './ResizeHandles';
+import RotationHandle from './RotationHandle';
 import { useResize } from '../hooks/useResize';
+import { useRotation } from '../hooks/useRotation';
 import { createNewRectangle, createNewCircle, createNewText, isWithinCanvasBounds, generateTempId } from '../utils/shapeFactory';
 import { constrainToBounds } from '../utils/constrainToBounds';
 import { getShapeDimensions } from '../utils/shapeUtils';
@@ -104,6 +106,14 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
   const { resizeDimensions, handleResizeStart, handleResize, handleResizeEnd } = useResize({
     objects,
     selectedObjectId,
+    updateObjectOptimistic,
+    userId: user?.id
+  });
+
+  // Rotation functionality (extracted to custom hook)
+  const { handleRotationStart, handleRotation, handleRotationEnd, rotateBy, resetRotation } = useRotation({
+    selectedObjectId,
+    objects,
     updateObjectOptimistic,
     userId: user?.id
   });
@@ -479,13 +489,41 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     duplicate: handleDuplicateObject
   }), [handleDuplicateObject]);
 
-  // Keyboard event handler (delete, duplicate)
+  // Keyboard event handler (delete, duplicate, rotate)
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent) => {
       // Duplicate: Ctrl/Cmd+D
       if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
         e.preventDefault(); // Prevent browser bookmark dialog
         await handleDuplicateObject();
+        return;
+      }
+
+      // Reset rotation: Ctrl/Cmd+Shift+R
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'r' || e.key === 'R')) {
+        e.preventDefault();
+        if (selectedObjectId) {
+          resetRotation();
+          toastFunction('Rotation reset to 0°', 'success', 1500);
+        }
+        return;
+      }
+
+      // Rotate 90° clockwise: ] key
+      if (e.key === ']' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        if (selectedObjectId) {
+          rotateBy(90);
+        }
+        return;
+      }
+
+      // Rotate 90° counter-clockwise: [ key
+      if (e.key === '[' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        if (selectedObjectId) {
+          rotateBy(-90);
+        }
         return;
       }
 
@@ -505,7 +543,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedObjectId, deleteObjectOptimistic, releaseObjectLock, handleDuplicateObject]);
+  }, [selectedObjectId, deleteObjectOptimistic, releaseObjectLock, handleDuplicateObject, rotateBy, resetRotation, toastFunction]);
 
   // Handle rectangle drag events
   const handleRectangleDragStart = useCallback((objectId: string) => {
@@ -804,6 +842,22 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
                   onResizeStart={handleResizeStart}
                   onResize={handleResize}
                   onResizeEnd={handleResizeEnd}
+                />
+              );
+            }
+            return null;
+          })()}
+
+          {/* Rotation handle for selected object (Phase 11.3) */}
+          {selectedObjectId && (() => {
+            const selectedObject = objects.find(obj => obj.id === selectedObjectId);
+            if (selectedObject && selectedObject.lockedBy === user?.id) {
+              return (
+                <RotationHandle
+                  object={selectedObject}
+                  onRotationStart={handleRotationStart}
+                  onRotation={handleRotation}
+                  onRotationEnd={handleRotationEnd}
                 />
               );
             }
