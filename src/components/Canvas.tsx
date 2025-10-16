@@ -1,5 +1,5 @@
 import React, { useRef, useState, useCallback, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
-import { Stage, Layer, Line, Rect } from 'react-konva';
+import { Stage, Layer, Line, Rect, Text, Group } from 'react-konva';
 import Konva from 'konva';
 import {
   CANVAS_WIDTH,
@@ -12,6 +12,8 @@ import type { ToolType } from './ToolPanel';
 import Rectangle from './Rectangle';
 import CircleComponent from './Circle';
 import TextObjectComponent from './TextObject';
+import ResizeHandles from './ResizeHandles';
+import { useResize } from '../hooks/useResize';
 import { createNewRectangle, createNewCircle, createNewText, isWithinCanvasBounds, generateTempId } from '../utils/shapeFactory';
 import { constrainToBounds } from '../utils/constrainToBounds';
 import { getShapeDimensions } from '../utils/shapeUtils';
@@ -97,6 +99,14 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
 
   // Selection state (local only, not synced)
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
+
+  // Resize functionality (extracted to custom hook)
+  const { resizeDimensions, handleResizeStart, handleResize, handleResizeEnd } = useResize({
+    objects,
+    selectedObjectId,
+    updateObjectOptimistic,
+    userId: user?.id
+  });
 
   // Notify parent when selection changes
   useEffect(() => {
@@ -469,7 +479,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     duplicate: handleDuplicateObject
   }), [handleDuplicateObject]);
 
-  // Keyboard event handler (delete, duplicate) - placed after handleDuplicateObject
+  // Keyboard event handler (delete, duplicate)
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent) => {
       // Duplicate: Ctrl/Cmd+D
@@ -783,6 +793,47 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
                 return null;
             }
           })}
+
+          {/* Resize handles for selected object (Stage 3: all object types) */}
+          {selectedObjectId && (() => {
+            const selectedObject = objects.find(obj => obj.id === selectedObjectId);
+            if (selectedObject && selectedObject.lockedBy === user?.id) {
+              return (
+                <ResizeHandles
+                  object={selectedObject}
+                  onResizeStart={handleResizeStart}
+                  onResize={handleResize}
+                  onResizeEnd={handleResizeEnd}
+                />
+              );
+            }
+            return null;
+          })()}
+
+          {/* Dimension tooltip during resize */}
+          {resizeDimensions && (
+            <Group x={resizeDimensions.x} y={resizeDimensions.y}>
+              <Rect
+                x={-40}
+                y={-15}
+                width={80}
+                height={30}
+                fill="rgba(0, 0, 0, 0.8)"
+                cornerRadius={4}
+              />
+              <Text
+                x={-40}
+                y={-10}
+                width={80}
+                height={20}
+                text={`${resizeDimensions.width} × ${resizeDimensions.height}`}
+                fontSize={12}
+                fill="white"
+                align="center"
+                verticalAlign="middle"
+              />
+            </Group>
+          )}
 
           {/* Render other users' cursors (teleport positioning - instant updates) */}
           {Array.from(otherCursors.entries()).map(([userId, cursorData]) => (

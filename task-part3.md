@@ -20,9 +20,10 @@ This document outlines the implementation plan for core canvas manipulation feat
   - Prevents duplicates from going outside canvas bounds
 
 **Resize Behavior**
-- **Text objects**: Scale font size proportionally with resize (Option A)
-  - Formula: `newFontSize = oldFontSize * (newHeight / oldHeight)`
-  - Clamp to range: 8px - 144px
+- **Text objects**: Resize bounding box only, font size stays constant
+  - Only width and height of bounding box change
+  - Font size remains unchanged (prevents font size from getting out of sync)
+  - User can manually adjust font size via text formatting tools (Phase 13)
 - **Resize handles**: Rotate with object (not axis-aligned)
   - More intuitive, matches Figma/Sketch behavior
 - **Overlap handling**: Allow overlap with locked objects (no collision detection)
@@ -184,23 +185,23 @@ This document outlines the implementation plan for core canvas manipulation feat
 - [ ] Test: Rapid duplicate operations
 - [ ] Test: Duplicate objects near canvas boundary (constrain to bounds)
 
-### 11.2 Resize Functionality
-- [ ] Add resize handles to selected objects (8 handles: corners + sides)
-- [ ] Corner handles: Resize proportionally (maintain aspect ratio with Shift key)
-- [ ] Side handles: Resize in one dimension only
-- [ ] Implement resize constraints:
-  - Minimum size: 20x20 pixels
-  - Maximum size: 2000x2000 pixels
-  - Keep object within canvas bounds during resize
-- [ ] Visual feedback during resize:
-  - Show current dimensions tooltip
-  - Update handles in real-time
-  - Preview resize before release
-- [ ] Resize for all object types:
-  - Rectangles: Standard resize
-  - Circles: Maintain circular shape (both dimensions together)
-  - Text: Resize bounding box (text re-flows or scales)
-- [ ] Real-time sync of resize to other users (throttled at 50ms)
+### 11.2 Resize Functionality ✅ COMPLETE
+- [x] Add resize handles to selected rectangles (4 corner handles) - Stage 1
+- [x] Side handles: Resize in one dimension only (top, bottom, left, right) - Stage 2
+- [x] Shift key: Maintain aspect ratio - Stage 2
+- [x] Implement resize constraints:
+  - Minimum size: 20x20 pixels ✅
+  - Maximum size: 2000x2000 pixels ✅
+  - Keep object within canvas bounds during resize ✅
+- [x] Visual feedback during resize - Stage 2:
+  - Show current dimensions tooltip ✅
+  - Update handles in real-time ✅
+  - Preview resize before release ✅
+- [x] Resize for all object types - Stage 3:
+  - Rectangles: Standard resize ✅
+  - Circles: Maintain circular shape (uniform scaling) ✅
+  - Text: Resize bounding box only (font size stays constant) ✅
+- [x] Real-time sync of resize to other users (throttled at 50ms) ✅
 - [ ] Lock must be held to resize (same as drag)
 - [ ] Toast: Show final dimensions on resize complete
 - [ ] Test: Resize from each corner/side
