@@ -6,6 +6,7 @@ import ToolPanel, { useToolState } from './components/ToolPanel';
 import PresenceIndicator from './components/PresenceIndicator';
 import UserList from './components/UserList';
 import AIChat from './components/AIChat';
+import ShortcutsPanel from './components/ShortcutsPanel';
 import { ToastProvider, useToastContext } from './contexts/ToastContext';
 import { ToastManager } from './components/Toast';
 import { useCanvas } from './hooks/useCanvas';
@@ -18,6 +19,7 @@ function AppContent() {
   const { activeTool, setActiveTool } = useToolState('select');
   const [showUserList, setShowUserList] = useState(false);
   const [showAIChat, setShowAIChat] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
   const { toasts, removeToast } = useToastContext();
   const { user } = useAuth();
   const toastFunction = createToastFunction(useToastContext());
@@ -41,6 +43,13 @@ function AppContent() {
 
       // Don't trigger shortcuts during text editing
       if (canvasRef.current?.isTextEditing()) {
+        return;
+      }
+
+      // Help: ? key to show shortcuts panel
+      if (e.key === '?' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        setShowShortcuts(true);
         return;
       }
 
@@ -249,6 +258,15 @@ function AppContent() {
                     🤖 AI Chat
                   </button>
 
+                  {/* Help Button */}
+                  <button
+                    onClick={() => setShowShortcuts(true)}
+                    className="px-3 py-1 text-sm rounded-lg font-medium transition-colors flex-shrink-0 bg-gray-200 hover:bg-gray-300 text-gray-700 border border-gray-300"
+                    title="Keyboard shortcuts (Press ?)"
+                  >
+                    ❓ Help
+                  </button>
+
                   {/* Clear Canvas Button */}
                   <button
                     onClick={() => {
@@ -372,6 +390,12 @@ function AppContent() {
             onClick={() => setShowAIChat(false)}
           />
         )}
+
+        {/* Keyboard Shortcuts Panel */}
+        <ShortcutsPanel 
+          isOpen={showShortcuts} 
+          onClose={() => setShowShortcuts(false)} 
+        />
       </ProtectedRoute>
     </div>
   );

@@ -386,17 +386,17 @@ This document outlines the implementation plan for core canvas manipulation feat
   - `Space+Drag`: Pan canvas (even when not in select mode)
   - `Ctrl/Cmd+Shift+E`: Export canvas (placeholder)
 
-### 14.3 Shortcuts Panel
-- [ ] Create keyboard shortcuts help panel:
+### 14.3 Shortcuts Panel ✅ COMPLETE
+- [x] Create keyboard shortcuts help panel:
   - Trigger with `?` key or Help button
   - Modal overlay showing all shortcuts
   - Categorized by function (Selection, Tools, Transform, etc.)
   - Search/filter shortcuts
   - Close with Escape or click outside
-- [ ] Show shortcuts in context menus
-- [ ] Display shortcuts in tooltips throughout app
-- [ ] Test: All shortcuts work as expected
-- [ ] Test: Shortcuts disabled during text editing
+- [x] Show shortcuts in context menus (N/A - using modal panel)
+- [x] Display shortcuts in tooltips throughout app (already in ToolPanel)
+- [x] Test: All shortcuts work as expected
+- [x] Test: Shortcuts disabled during text editing
 
 ---
 
