@@ -15,6 +15,7 @@ import TextObjectComponent from './TextObject';
 import ResizeHandles from './ResizeHandles';
 import RotationHandle from './RotationHandle';
 import TextFormattingToolbar from './TextFormattingToolbar';
+import TextEditorOverlay from './TextEditorOverlay';
 import { useResize } from '../hooks/useResize';
 import { useRotation } from '../hooks/useRotation';
 import { createNewRectangle, createNewCircle, createNewText, isWithinCanvasBounds, generateTempId } from '../utils/shapeFactory';
@@ -102,6 +103,9 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
 
   // Selection state (local only, not synced) - Multi-select support
   const [selectedObjectIds, setSelectedObjectIds] = useState<string[]>([]);
+  
+  // Text editing state (track which text object is being edited)
+  const [editingTextId, setEditingTextId] = useState<string | null>(null);
   
   // Store initial positions for group drag (to calculate accurate deltas)
   const groupDragStartPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
@@ -430,6 +434,33 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     });
   }, [user?.id, updateObjectOptimistic]);
 
+  // Handle entering text edit mode
+  const handleStartTextEdit = useCallback((textObjectId: string) => {
+    const textObject = objects.find(obj => obj.id === textObjectId);
+    
+    // Can only edit if user has lock
+    if (!textObject || textObject.lockedBy !== user?.id) {
+      console.warn('Cannot edit text: user does not have lock');
+      return false;
+    }
+    
+    setEditingTextId(textObjectId);
+    return true;
+  }, [objects, user?.id]);
+
+  // Handle exiting text edit mode and saving changes
+  const handleEndTextEdit = useCallback((textObjectId: string, newText: string, save: boolean = true) => {
+    if (save && user?.id) {
+      // Update the text content
+      updateObjectOptimistic(textObjectId, {
+        text: newText,
+        modifiedBy: user.id
+      });
+    }
+    
+    setEditingTextId(null);
+  }, [user?.id, updateObjectOptimistic]);
+
   // Handle duplicate object(s) (Ctrl/Cmd+D) - Supports multi-select
   const handleDuplicateObject = useCallback(async () => {
     if (!user?.id || selectedObjectIds.length === 0) {
@@ -508,6 +539,21 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
   // Keyboard event handler (delete, duplicate, rotate)
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent) => {
+      // Disable all canvas shortcuts during text editing
+      if (editingTextId) {
+        return;
+      }
+
+      // Disable canvas shortcuts when typing in input fields (AI chat, etc.)
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+
       // Duplicate: Ctrl/Cmd+D
       if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
         e.preventDefault(); // Prevent browser bookmark dialog
@@ -575,7 +621,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedObjectIds, deleteObjectOptimistic, releaseMultipleLocks, handleDuplicateObject, rotateBy, resetRotation, toastFunction]);
+  }, [selectedObjectIds, deleteObjectOptimistic, releaseMultipleLocks, handleDuplicateObject, rotateBy, resetRotation, toastFunction, editingTextId]);
 
   // Handle rectangle drag events (supports group movement for multi-select)
   const handleRectangleDragStart = useCallback((objectId: string) => {
@@ -750,8 +796,8 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     const pos = stage.getPointerPosition();
     if (!pos) return;
 
-    // Handle panning if active
-    if (isPanning) {
+    // Handle panning if active (but not during text editing)
+    if (isPanning && !editingTextId) {
       const dx = pos.x - lastPointerPosition.x;
       const dy = pos.y - lastPointerPosition.y;
 
@@ -773,7 +819,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     if (user?.id) {
       throttledCursorUpdate(canvasCoords.x, canvasCoords.y);
     }
-  }, [isPanning, lastPointerPosition, viewport, constrainViewport, stageToCanvasCoords, user?.id, throttledCursorUpdate]);
+  }, [isPanning, lastPointerPosition, viewport, constrainViewport, stageToCanvasCoords, user?.id, throttledCursorUpdate, editingTextId]);
 
   // Handle mouse up to stop panning
   const handleMouseUp = useCallback(() => {
@@ -840,8 +886,8 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
 
   return (
     <div className="w-full h-full bg-gray-100 overflow-hidden relative">
-      {/* Text Formatting Toolbar - shows when single text object is selected */}
-      {selectedObjectIds.length === 1 && (() => {
+      {/* Text Formatting Toolbar - shows when single text object is selected and NOT editing */}
+      {selectedObjectIds.length === 1 && !editingTextId && (() => {
         const selectedObject = objects.find(obj => obj.id === selectedObjectIds[0]);
         if (selectedObject && selectedObject.type === 'text' && selectedObject.lockedBy === user?.id) {
           return (
@@ -849,6 +895,23 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
               textObject={selectedObject}
               onUpdateFormatting={(updates) => handleTextFormattingUpdate(selectedObject.id, updates)}
               canEdit={true}
+            />
+          );
+        }
+        return null;
+      })()}
+
+      {/* Text Editor Overlay - shows when editing text */}
+      {editingTextId && (() => {
+        const textObject = objects.find(obj => obj.id === editingTextId);
+        if (textObject && textObject.type === 'text') {
+          return (
+            <TextEditorOverlay
+              textObject={textObject}
+              viewport={viewport}
+              stageRef={stageRef}
+              onSave={(newText) => handleEndTextEdit(editingTextId, newText, true)}
+              onCancel={() => handleEndTextEdit(editingTextId, textObject.text, false)}
             />
           );
         }
@@ -938,6 +1001,8 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
                     key={object.id}
                     {...sharedProps}
                     textObject={object}
+                    isEditing={editingTextId === object.id}
+                    onStartEdit={handleStartTextEdit}
                   />
                 );
               default:

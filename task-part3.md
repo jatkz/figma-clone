@@ -315,39 +315,39 @@ This document outlines the implementation plan for core canvas manipulation feat
 - [x] Test: Format AI-generated text objects
 - [x] Test: Formatting persists after deselect/reselect
 
-### 13.2 Text Editing
-- [ ] Double-click text to enter edit mode:
+### 13.2 Text Editing ✅ COMPLETE
+- [x] Double-click text to enter edit mode:
   - Show text cursor (blinking caret)
   - Enable keyboard input
   - Disable canvas pan/zoom while editing
   - Show edit border around text box
-- [ ] Text editing features:
+- [x] Text editing features:
   - Type to add text
   - Backspace/Delete to remove text
   - Arrow keys to move cursor
   - Click to position cursor
   - Select text with click-drag or Shift+Arrow
   - Cut/Copy/Paste (Ctrl/Cmd+X/C/V)
-- [ ] Multi-line text support:
+- [x] Multi-line text support:
   - Enter key: New line
   - Text wraps at bounding box width
   - Auto-expand height as needed
-- [ ] Edit mode exit:
+- [x] Edit mode exit:
   - Click outside text: Save and exit
   - Escape key: Cancel changes
   - Ctrl/Cmd+Enter: Save and exit
-- [ ] Lock behavior during edit:
+- [x] Lock behavior during edit:
   - Must have lock to edit
   - Lock prevents other users from editing
   - Show "Being edited by [User]" to others
-- [ ] Real-time sync:
+- [x] Real-time sync:
   - Throttle text updates (200ms) while typing
   - Send final version on exit
   - Other users see live typing indicator
-- [ ] Test: Edit text with multiple users viewing
-- [ ] Test: Multi-line text editing
-- [ ] Test: Cut/copy/paste text
-- [ ] Test: Cancel vs save changes
+- [x] Test: Edit text with multiple users viewing
+- [x] Test: Multi-line text editing
+- [x] Test: Cut/copy/paste text
+- [x] Test: Cancel vs save changes
 
 ---
 

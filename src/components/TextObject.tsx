@@ -1,15 +1,17 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { Text as KonvaText, Group, Rect } from 'react-konva';
 import type { TextObject, User } from '../types/canvas';
 
 interface TextObjectProps {
   textObject: TextObject;
   isSelected: boolean;
+  isEditing: boolean;
   onSelect: (id: string, shiftKey?: boolean) => Promise<void> | boolean;
   onDeselect: () => Promise<void> | void;
   onDragStart: (objectId: string) => boolean;
   onDragMove: (id: string, x: number, y: number) => void;
   onDragEnd: (id: string, x: number, y: number) => Promise<void> | void;
+  onStartEdit: (id: string) => boolean;
   currentUserId?: string;
   users: Map<string, User>;
 }
@@ -17,11 +19,13 @@ interface TextObjectProps {
 const TextObjectComponent: React.FC<TextObjectProps> = ({
   textObject,
   isSelected,
+  isEditing,
   onSelect,
   onDeselect,
   onDragStart,
   onDragMove,
   onDragEnd,
+  onStartEdit,
   currentUserId,
   users,
 }) => {
@@ -33,6 +37,18 @@ const TextObjectComponent: React.FC<TextObjectProps> = ({
   // Calculate text dimensions
   const textWidth = textObject.width || textObject.text.length * textObject.fontSize * 0.6;
   const textHeight = textObject.height || textObject.fontSize * 1.2;
+
+  // Handle double-click to enter edit mode
+  const handleDoubleClick = useCallback((e: any) => {
+    e.cancelBubble = true;
+    
+    if (isLockedByOther) {
+      return; // Can't edit text locked by others
+    }
+    
+    // Try to enter edit mode
+    onStartEdit(textObject.id);
+  }, [isLockedByOther, onStartEdit, textObject.id]);
 
   const handleClick = (e: any) => {
     e.cancelBubble = true;
@@ -174,10 +190,12 @@ const TextObjectComponent: React.FC<TextObjectProps> = ({
         width={textObject.width}
         height={textObject.height}
         rotation={textObject.rotation}
-        opacity={opacity}
-        draggable={isLockedByCurrentUser}
+        opacity={isEditing ? 0.3 : opacity}
+        draggable={isLockedByCurrentUser && !isEditing}
         onClick={handleClick}
         onTap={handleClick}
+        onDblClick={handleDoubleClick}
+        onDblTap={handleDoubleClick}
         onDragStart={handleDragStart}
         onDragMove={handleDragMove}
         onDragEnd={handleDragEnd}
@@ -204,7 +222,7 @@ const TextObjectComponent: React.FC<TextObjectProps> = ({
       )}
 
       {/* Lock indicator for objects locked by current user */}
-      {isLockedByCurrentUser && !isSelected && (
+      {isLockedByCurrentUser && !isSelected && !isEditing && (
         <Group>
           {/* Editing indicator */}
           <KonvaText
