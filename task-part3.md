@@ -402,28 +402,28 @@ This document outlines the implementation plan for core canvas manipulation feat
 
 ## Phase 15: Export Functionality (Tier 1)
 
-### 15.1 PNG Export
-- [ ] Add "Export" button to toolbar/menu
-- [ ] Export current viewport as PNG:
+### 15.1 PNG Export ✅ COMPLETE
+- [x] Add "Export" button to toolbar/menu
+- [x] Export current viewport as PNG:
   - Capture visible canvas area
   - Render at current zoom level
   - Include all visible objects (exclude UI elements)
-- [ ] Export options dialog:
+- [x] Export options dialog:
   - Export viewport (what you see)
   - Export entire canvas (5000x5000)
   - Export selected objects only
   - Choose scale/resolution (1x, 2x, 4x)
   - Include/exclude background
-- [ ] PNG export implementation:
+- [x] PNG export implementation:
   - Use Konva's `.toDataURL()` method
   - Convert canvas to PNG blob
   - Trigger browser download
   - Filename: `canvas-export-[timestamp].png`
-- [ ] Progress indicator for large exports
-- [ ] Handle errors gracefully (browser permissions, memory limits)
-- [ ] Test: Export viewport at different zoom levels
-- [ ] Test: Export entire canvas (check memory usage)
-- [ ] Test: Export with complex scenes (50+ objects)
+- [x] Progress indicator for large exports
+- [x] Handle errors gracefully (browser permissions, memory limits)
+- [x] Test: Export viewport at different zoom levels
+- [x] Test: Export entire canvas (check memory usage)
+- [x] Test: Export with complex scenes (50+ objects)
 
 ### 15.2 SVG Export
 - [ ] SVG export implementation:

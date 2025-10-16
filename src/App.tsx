@@ -7,6 +7,7 @@ import PresenceIndicator from './components/PresenceIndicator';
 import UserList from './components/UserList';
 import AIChat from './components/AIChat';
 import ShortcutsPanel from './components/ShortcutsPanel';
+import ExportDialog, { type ExportOptions } from './components/ExportDialog';
 import { ToastProvider, useToastContext } from './contexts/ToastContext';
 import { ToastManager } from './components/Toast';
 import { useCanvas } from './hooks/useCanvas';
@@ -20,6 +21,7 @@ function AppContent() {
   const [showUserList, setShowUserList] = useState(false);
   const [showAIChat, setShowAIChat] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showExport, setShowExport] = useState(false);
   const { toasts, removeToast } = useToastContext();
   const { user } = useAuth();
   const toastFunction = createToastFunction(useToastContext());
@@ -136,7 +138,7 @@ function AppContent() {
       // Export: Ctrl/Cmd+Shift+E
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'E') {
         e.preventDefault();
-        toastFunction('Export functionality coming soon', 'info', 2000);
+        setShowExport(true);
         return;
       }
 
@@ -214,6 +216,16 @@ function AppContent() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [setActiveTool, clipboard, toastFunction]);
 
+  // Handle canvas export
+  const handleExport = async (options: ExportOptions) => {
+    try {
+      await canvasRef.current?.exportToPNG(options);
+    } catch (error) {
+      console.error('Export error:', error);
+      throw error;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Toast Manager - Rendered at App level with Portal */}
@@ -265,6 +277,15 @@ function AppContent() {
                     title="Keyboard shortcuts (Press ?)"
                   >
                     ❓ Help
+                  </button>
+
+                  {/* Export Button */}
+                  <button
+                    onClick={() => setShowExport(true)}
+                    className="px-3 py-1 text-sm rounded-lg font-medium transition-colors flex-shrink-0 bg-green-100 hover:bg-green-200 text-green-700 border border-green-200"
+                    title="Export canvas (Ctrl+Shift+E)"
+                  >
+                    📥 Export
                   </button>
 
                   {/* Clear Canvas Button */}
@@ -395,6 +416,14 @@ function AppContent() {
         <ShortcutsPanel 
           isOpen={showShortcuts} 
           onClose={() => setShowShortcuts(false)} 
+        />
+
+        {/* Export Dialog */}
+        <ExportDialog
+          isOpen={showExport}
+          onClose={() => setShowExport(false)}
+          onExport={handleExport}
+          hasSelection={hasSelection}
         />
       </ProtectedRoute>
     </div>
