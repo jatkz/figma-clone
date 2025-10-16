@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import ProtectedRoute from './components/ProtectedRoute';
 import LogoutButton from './components/LogoutButton';
-import Canvas from './components/Canvas';
+import Canvas, { type CanvasRef } from './components/Canvas';
 import ToolPanel, { useToolState } from './components/ToolPanel';
 import PresenceIndicator from './components/PresenceIndicator';
 import UserList from './components/UserList';
@@ -22,6 +22,8 @@ function AppContent() {
   const { user } = useAuth();
   const toastFunction = createToastFunction(useToastContext());
   const { deleteAllObjectsOptimistic } = useCanvas(user?.id, toastFunction);
+  const canvasRef = useRef<CanvasRef>(null);
+  const [hasSelection, setHasSelection] = useState(false);
 
 
   return (
@@ -96,13 +98,19 @@ function AppContent() {
               <ToolPanel 
                 activeTool={activeTool}
                 onToolChange={setActiveTool}
+                onDuplicate={() => canvasRef.current?.duplicate()}
+                hasSelection={hasSelection}
               />
             </div>
             
             {/* Canvas Area */}
             <div className="flex-1 p-4 pl-0 pr-0">
               <div className="bg-white rounded-lg shadow h-full mr-4">
-                <Canvas activeTool={activeTool} />
+                <Canvas 
+                  ref={canvasRef}
+                  activeTool={activeTool}
+                  onSelectionChange={setHasSelection}
+                />
               </div>
             </div>
           </div>

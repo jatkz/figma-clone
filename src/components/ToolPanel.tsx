@@ -6,9 +6,11 @@ export type ToolType = 'select' | 'rectangle' | 'circle' | 'text';
 interface ToolPanelProps {
   activeTool: ToolType;
   onToolChange: (tool: ToolType) => void;
+  onDuplicate?: () => void;
+  hasSelection?: boolean;
 }
 
-const ToolPanel: React.FC<ToolPanelProps> = ({ activeTool, onToolChange }) => {
+const ToolPanel: React.FC<ToolPanelProps> = ({ activeTool, onToolChange, onDuplicate, hasSelection }) => {
   return (
     <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-2 flex flex-col gap-2">
       <h3 className="text-xs font-medium text-gray-600 px-2 mb-1">Tools</h3>
@@ -48,6 +50,20 @@ const ToolPanel: React.FC<ToolPanelProps> = ({ activeTool, onToolChange }) => {
         onClick={() => onToolChange('text')}
         shortcut="T"
       />
+
+      {/* Divider */}
+      {onDuplicate && <div className="border-t border-gray-200 my-1" />}
+      
+      {/* Duplicate Button */}
+      {onDuplicate && (
+        <ActionButton
+          icon={<DuplicateIcon />}
+          label="Duplicate"
+          onClick={onDuplicate}
+          shortcut="Ctrl+D"
+          disabled={!hasSelection}
+        />
+      )}
     </div>
   );
 };
@@ -126,6 +142,61 @@ const TextIcon: React.FC = () => (
     <line x1="12" y1="4" x2="12" y2="20" />
   </svg>
 );
+
+const DuplicateIcon: React.FC = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+  </svg>
+);
+
+// Action button component (for non-tool actions like duplicate)
+interface ActionButtonProps {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  shortcut?: string;
+  disabled?: boolean;
+}
+
+const ActionButton: React.FC<ActionButtonProps> = ({ 
+  icon, 
+  label, 
+  onClick, 
+  shortcut,
+  disabled 
+}) => {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`
+        flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200
+        ${disabled 
+          ? 'text-gray-400 bg-gray-50 cursor-not-allowed opacity-50' 
+          : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900 active:bg-gray-200'
+        }
+      `}
+      title={`${label} ${shortcut ? `(${shortcut})` : ''}`}
+    >
+      <div className={`w-5 h-5 ${disabled ? 'text-gray-400' : 'text-gray-500'}`}>
+        {icon}
+      </div>
+      <span className="flex-1 text-left">{label}</span>
+      {shortcut && (
+        <kbd className={`
+          px-1.5 py-0.5 text-xs rounded border
+          ${disabled 
+            ? 'bg-gray-50 text-gray-400 border-gray-200' 
+            : 'bg-gray-100 text-gray-500 border-gray-200'
+          }
+        `}>
+          {shortcut}
+        </kbd>
+      )}
+    </button>
+  );
+};
 
 // Hook for managing tool state
 export const useToolState = (initialTool: ToolType = 'select') => {

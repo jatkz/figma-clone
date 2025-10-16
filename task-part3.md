@@ -165,21 +165,21 @@ This document outlines the implementation plan for core canvas manipulation feat
 
 ## Phase 11: Core Object Manipulation
 
-### 11.1 Duplicate Functionality
-- [ ] Implement duplicate keyboard shortcut (Ctrl/Cmd+D)
-- [ ] Add "Duplicate" context menu option
-- [ ] Duplicate logic:
+### 11.1 Duplicate Functionality ✅
+- [x] Implement duplicate keyboard shortcut (Ctrl/Cmd+D)
+- [ ] Add "Duplicate" context menu option (deferred - context menu system not implemented)
+- [x] Duplicate logic:
   - Copy all object properties (position, size, color, rotation)
-  - Offset duplicated object by (20px, 20px) from original
-  - Generate new unique ID
+  - Smart offset logic based on edge proximity
+  - Generate new unique ID (via Firestore)
   - Auto-select duplicated object
   - Release lock on original, acquire lock on duplicate
-- [ ] Handle duplicate for all object types:
+- [x] Handle duplicate for all object types:
   - Rectangles
   - Circles
   - Text objects
-- [ ] Sync duplicate operation to all users
-- [ ] Toast notification: "Object duplicated"
+- [x] Sync duplicate operation to all users (via createObjectOptimistic)
+- [x] Toast notification: "Object duplicated"
 - [ ] Test: Duplicate while another user is viewing
 - [ ] Test: Rapid duplicate operations
 - [ ] Test: Duplicate objects near canvas boundary (constrain to bounds)

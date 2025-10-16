@@ -1,17 +1,18 @@
-import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useRef, useState, useCallback, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { Stage, Layer, Line, Rect } from 'react-konva';
 import Konva from 'konva';
 import {
   CANVAS_WIDTH,
   CANVAS_HEIGHT,
   CANVAS_CENTER_X,
-  CANVAS_CENTER_Y
+  CANVAS_CENTER_Y,
+  type CanvasObject
 } from '../types/canvas';
 import type { ToolType } from './ToolPanel';
 import Rectangle from './Rectangle';
 import CircleComponent from './Circle';
 import TextObjectComponent from './TextObject';
-import { createNewRectangle, createNewCircle, createNewText, isWithinCanvasBounds } from '../utils/shapeFactory';
+import { createNewRectangle, createNewCircle, createNewText, isWithinCanvasBounds, generateTempId } from '../utils/shapeFactory';
 import { constrainToBounds } from '../utils/constrainToBounds';
 import { getShapeDimensions } from '../utils/shapeUtils';
 import { useAuth } from '../hooks/useAuth';
@@ -49,10 +50,14 @@ interface ViewportState {
 
 interface CanvasProps {
   activeTool: ToolType;
+  onSelectionChange?: (hasSelection: boolean) => void;
 }
 
+export interface CanvasRef {
+  duplicate: () => void;
+}
 
-const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
+const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChange }, ref) => {
   const stageRef = useRef<Konva.Stage>(null);
   const { user } = useAuth();
   
@@ -92,6 +97,11 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
 
   // Selection state (local only, not synced)
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
+
+  // Notify parent when selection changes
+  useEffect(() => {
+    onSelectionChange?.(selectedObjectId !== null);
+  }, [selectedObjectId, onSelectionChange]);
 
   // Cursor position state for multiplayer cursor tracking
   const [, setCursorPosition] = useState<{ x: number; y: number } | null>(null);
@@ -155,26 +165,6 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
     return () => window.removeEventListener('resize', updateSize);
   }, []);
 
-  // Handle keyboard events (delete selected rectangle)
-  useEffect(() => {
-    const handleKeyDown = async (e: KeyboardEvent) => {
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (selectedObjectId) {
-          // Delete selected rectangle with Firestore sync
-          const success = await deleteObjectOptimistic(selectedObjectId);
-          if (success) {
-            // Release lock automatically on successful deletion
-            await releaseObjectLock(selectedObjectId);
-            setSelectedObjectId(null);
-          }
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedObjectId, deleteObjectOptimistic, releaseObjectLock]);
-
   // Set up cursor subscription for multiplayer cursors
   useEffect(() => {
     if (!user?.id) return;
@@ -231,18 +221,13 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
 
   // Handle rectangle click with locking and enhanced messaging
   const handleRectangleClick = useCallback(async (objectId: string) => {
-    console.log('🖱️ handleRectangleClick called:', { objectId, selectedObjectId, activeTool });
-    
     if (activeTool === 'select') {
       // If already selected, deselect and release lock
       if (selectedObjectId === objectId) {
-        console.log('✅ Deselecting object:', objectId);
         await releaseObjectLock(objectId);
         setSelectedObjectId(null);
         return;
       }
-      
-      console.log('📌 Attempting to select new object:', objectId);
 
       // Find the object to get user information for better messaging
       const targetObject = objects.find(obj => obj.id === objectId);
@@ -358,6 +343,159 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
       setSelectedObjectId(createdObject.id);
     }
   }, [user?.id, screenToCanvasCoords, createObjectOptimistic]);
+
+  // Calculate smart offset for duplicate (avoid canvas edges)
+  const getSmartDuplicateOffset = useCallback((object: CanvasObject): { x: number; y: number } => {
+    const defaultOffset = 20;
+    const edgeThreshold = 20; // Distance from edge to trigger smart offset
+    
+    let offsetX = defaultOffset;
+    let offsetY = defaultOffset;
+    
+    // Get object dimensions
+    const dimensions = getShapeDimensions(object);
+    
+    // Near right edge - offset left instead
+    if (object.x + dimensions.width + defaultOffset > CANVAS_WIDTH - edgeThreshold) {
+      offsetX = -defaultOffset;
+    }
+    
+    // Near bottom edge - offset up instead
+    if (object.y + dimensions.height + defaultOffset > CANVAS_HEIGHT - edgeThreshold) {
+      offsetY = -defaultOffset;
+    }
+    
+    return { x: offsetX, y: offsetY };
+  }, []);
+
+  // Handle duplicate object (Ctrl/Cmd+D)
+  const handleDuplicateObject = useCallback(async () => {
+    if (!user?.id || !selectedObjectId) {
+      return;
+    }
+
+    // Find the selected object
+    const objectToDuplicate = objects.find(obj => obj.id === selectedObjectId);
+    if (!objectToDuplicate) {
+      toastFunction('No object selected', 'warning', 2000);
+      return;
+    }
+
+    // Check if user has lock on the object
+    if (objectToDuplicate.lockedBy !== user.id) {
+      toastFunction('Cannot duplicate: object is being edited by another user', 'warning', 2000);
+      return;
+    }
+
+    // Calculate smart offset
+    const offset = getSmartDuplicateOffset(objectToDuplicate);
+    const newX = objectToDuplicate.x + offset.x;
+    const newY = objectToDuplicate.y + offset.y;
+
+    // Constrain to canvas bounds
+    const dimensions = getShapeDimensions(objectToDuplicate);
+    const constrainedPos = constrainToBounds(newX, newY, dimensions.width, dimensions.height);
+
+    // Create duplicate object based on type
+    let duplicateObject: CanvasObject;
+
+    switch (objectToDuplicate.type) {
+      case 'rectangle':
+        duplicateObject = {
+          ...objectToDuplicate,
+          id: generateTempId(), // Temporary ID for optimistic update
+          x: constrainedPos.x,
+          y: constrainedPos.y,
+          createdBy: user.id,
+          modifiedBy: user.id,
+          lockedBy: null,
+          lockedAt: null,
+          version: 1,
+        };
+        break;
+
+      case 'circle':
+        duplicateObject = {
+          ...objectToDuplicate,
+          id: generateTempId(), // Temporary ID for optimistic update
+          x: constrainedPos.x,
+          y: constrainedPos.y,
+          createdBy: user.id,
+          modifiedBy: user.id,
+          lockedBy: null,
+          lockedAt: null,
+          version: 1,
+        };
+        break;
+
+      case 'text':
+        duplicateObject = {
+          ...objectToDuplicate,
+          id: generateTempId(), // Temporary ID for optimistic update
+          x: constrainedPos.x,
+          y: constrainedPos.y,
+          createdBy: user.id,
+          modifiedBy: user.id,
+          lockedBy: null,
+          lockedAt: null,
+          version: 1,
+        };
+        break;
+
+      default:
+        toastFunction('Cannot duplicate this object type', 'error', 2000);
+        return;
+    }
+
+    // Create the duplicate with optimistic updates
+    const createdObject = await createObjectOptimistic(duplicateObject);
+
+    if (createdObject) {
+      // Release lock on original object
+      await releaseObjectLock(selectedObjectId);
+      
+      // Select and acquire lock on the new duplicate
+      setSelectedObjectId(createdObject.id);
+      await acquireObjectLock(createdObject.id);
+      
+      toastFunction('Object duplicated', 'success', 1500);
+    } else {
+      toastFunction('Failed to duplicate object', 'error', 2000);
+    }
+  }, [user?.id, selectedObjectId, objects, getSmartDuplicateOffset, createObjectOptimistic, releaseObjectLock, acquireObjectLock, toastFunction]);
+
+  // Expose duplicate function to parent via ref
+  useImperativeHandle(ref, () => ({
+    duplicate: handleDuplicateObject
+  }), [handleDuplicateObject]);
+
+  // Keyboard event handler (delete, duplicate) - placed after handleDuplicateObject
+  useEffect(() => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      // Duplicate: Ctrl/Cmd+D
+      if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+        e.preventDefault(); // Prevent browser bookmark dialog
+        await handleDuplicateObject();
+        return;
+      }
+
+      // Delete: Delete or Backspace key
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedObjectId) {
+          // Delete selected object with Firestore sync
+          const success = await deleteObjectOptimistic(selectedObjectId);
+          if (success) {
+            // Release lock automatically on successful deletion
+            await releaseObjectLock(selectedObjectId);
+            setSelectedObjectId(null);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedObjectId, deleteObjectOptimistic, releaseObjectLock, handleDuplicateObject]);
 
   // Handle rectangle drag events
   const handleRectangleDragStart = useCallback((objectId: string) => {
@@ -658,7 +796,9 @@ const Canvas: React.FC<CanvasProps> = ({ activeTool }) => {
       </Stage>
     </div>
   );
-};
+});
+
+Canvas.displayName = 'Canvas';
 
 // Grid component for visual reference
 const Grid: React.FC<{ width: number; height: number; scale: number }> = ({ 
