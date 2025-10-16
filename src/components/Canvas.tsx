@@ -26,7 +26,7 @@ import { useCanvas } from '../hooks/useCanvas';
 import { useToastContext, createToastFunction } from '../contexts/ToastContext';
 import { updateCursor, subscribeToCursors, type CursorData } from '../services/canvasService';
 import { initializeAICanvasState, cleanupAICanvasState } from '../services/aiCanvasService';
-import { exportToSVG, exportToPNG, type ExportOptions } from '../utils/canvasExport';
+import { exportToSVG, exportToPNG, generatePreview, type ExportOptions } from '../utils/canvasExport';
 import Cursor from './Cursor';
 
 // Throttle utility for cursor updates
@@ -77,6 +77,7 @@ export interface CanvasRef {
   zoomOut: () => void;
   resetZoom: () => void;
   exportCanvas: (options: ExportOptions) => Promise<void>;
+  generatePreview: (mode: 'viewport' | 'entire' | 'selected') => string | null;
 }
 
 const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChange }, ref) => {
@@ -695,6 +696,21 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
         console.error('Export failed:', error);
         throw error;
       }
+    },
+    generatePreview: (mode: 'viewport' | 'entire' | 'selected') => {
+      const stage = stageRef.current;
+      if (!stage) {
+        return null;
+      }
+      
+      const params = {
+        stage,
+        objects,
+        viewport,
+        selectedObjectIds
+      };
+      
+      return generatePreview(params, mode);
     }
   }), [handleDuplicateObject, handleDeleteSelected, handleClearSelection, handleSelectAll, handleSelectNext, handleSelectPrevious, rotateBy, resetRotation, selectedObjectIds, editingTextId, toastFunction, viewport, objects, stageRef]);
 

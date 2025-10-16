@@ -16,6 +16,116 @@ export interface ExportOptions {
 }
 
 /**
+ * Generate a preview thumbnail of the canvas
+ */
+export function generatePreview(
+  params: CanvasExportParams,
+  mode: 'viewport' | 'entire' | 'selected'
+): string | null {
+  const { stage, objects, selectedObjectIds } = params;
+
+  try {
+    if (mode === 'viewport') {
+      // Preview current viewport
+      return stage.toDataURL({
+        pixelRatio: 0.5,
+        mimeType: 'image/png',
+      });
+    } else if (mode === 'entire') {
+      // Preview entire canvas (5000x5000)
+      const tempStage = stage.clone();
+      tempStage.setAttrs({
+        x: 0,
+        y: 0,
+        scaleX: 1,
+        scaleY: 1,
+        width: 5000,
+        height: 5000,
+      });
+      
+      const preview = tempStage.toDataURL({
+        pixelRatio: 0.04, // Very low for 5000x5000 (results in ~200px preview)
+        mimeType: 'image/png',
+      });
+      
+      tempStage.destroy();
+      return preview;
+    } else if (mode === 'selected') {
+      // Preview selected objects only
+      if (selectedObjectIds.length === 0) {
+        return null;
+      }
+      
+      // Find bounding box of selected objects
+      const selectedObjects = objects.filter(obj => selectedObjectIds.includes(obj.id));
+      if (selectedObjects.length === 0) {
+        return null;
+      }
+      
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      
+      selectedObjects.forEach(obj => {
+        const width = 'width' in obj && obj.width ? obj.width : ('radius' in obj && obj.radius ? obj.radius * 2 : 100);
+        const height = 'height' in obj && obj.height ? obj.height : ('radius' in obj && obj.radius ? obj.radius * 2 : 100);
+        
+        minX = Math.min(minX, obj.x);
+        minY = Math.min(minY, obj.y);
+        maxX = Math.max(maxX, obj.x + width);
+        maxY = Math.max(maxY, obj.y + height);
+      });
+      
+      const padding = 20;
+      const exportWidth = maxX - minX + padding * 2;
+      const exportHeight = maxY - minY + padding * 2;
+      
+      // Clone and filter to selected objects
+      const tempStage = stage.clone();
+      const layers = tempStage.getLayers();
+      
+      layers.forEach(layer => {
+        const children = layer.getChildren();
+        children.forEach(child => {
+          const id = child.id();
+          if (id && !selectedObjectIds.includes(id)) {
+            child.destroy();
+          }
+        });
+      });
+      
+      tempStage.setAttrs({
+        x: -(minX - padding),
+        y: -(minY - padding),
+        scaleX: 1,
+        scaleY: 1,
+        width: exportWidth,
+        height: exportHeight,
+      });
+      
+      // Calculate appropriate pixel ratio for preview (target ~200px max dimension)
+      const maxDimension = Math.max(exportWidth, exportHeight);
+      const targetSize = 200;
+      const pixelRatio = maxDimension > targetSize ? targetSize / maxDimension : 1;
+      
+      const preview = tempStage.toDataURL({
+        pixelRatio: pixelRatio,
+        mimeType: 'image/png',
+      });
+      
+      tempStage.destroy();
+      return preview;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Failed to generate preview:', error);
+    return null;
+  }
+}
+
+/**
  * Export canvas to SVG format
  */
 export async function exportToSVG(

@@ -425,6 +425,7 @@ function AppContent() {
           onClose={() => setShowExport(false)}
           onExport={handleExport}
           hasSelection={hasSelection}
+          canvasRef={canvasRef}
         />
       </ProtectedRoute>
     </div>

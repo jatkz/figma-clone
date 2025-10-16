@@ -445,9 +445,9 @@ This document outlines the implementation plan for core canvas manipulation feat
 - [x] Test: SVG maintains colors and transformations
 - [x] Test: Text objects export correctly as text (not paths)
 
-### 15.3 Export UI
-- [ ] Export button in header toolbar
-- [ ] Export modal with options:
+### 15.3 Export UI ✅ COMPLETE
+- [x] Export button in header toolbar
+- [x] Export modal with options:
   - Format selector (PNG/SVG tabs)
   - Area selector (Viewport/Entire/Selected)
   - Scale selector for PNG (1x/2x/4x)
@@ -455,9 +455,9 @@ This document outlines the implementation plan for core canvas manipulation feat
   - Preview thumbnail
   - File size estimate
   - "Export" and "Cancel" buttons
-- [ ] Show success toast after export
-- [ ] Error handling with helpful messages
-- [ ] Test: Complete export flow for both formats
+- [x] Show success toast after export
+- [x] Error handling with helpful messages
+- [x] Test: Complete export flow for both formats
 
 ---
 
