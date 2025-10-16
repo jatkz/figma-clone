@@ -101,12 +101,18 @@ const RotationHandle: React.FC<RotationHandleProps> = ({
         strokeWidth={2}
         onMouseDown={handleMouseDown}
         onMouseEnter={(e) => {
-          const container = e.target.getStage().container();
-          container.style.cursor = 'grab';
+          const stage = e.target.getStage();
+          if (stage) {
+            const container = stage.container();
+            container.style.cursor = 'grab';
+          }
         }}
         onMouseLeave={(e) => {
-          const container = e.target.getStage().container();
-          container.style.cursor = 'default';
+          const stage = e.target.getStage();
+          if (stage) {
+            const container = stage.container();
+            container.style.cursor = 'default';
+          }
         }}
       />
 
