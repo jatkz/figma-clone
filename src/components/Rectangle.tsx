@@ -6,7 +6,7 @@ import { constrainToBounds } from '../utils/constrainToBounds';
 interface RectangleProps {
   object: RectangleObject;
   isSelected?: boolean;
-  onClick?: (objectId: string) => void;
+  onClick?: (objectId: string, shiftKey: boolean) => void;
   onDragStart?: (objectId: string) => boolean; // Now returns boolean to indicate if drag should be allowed
   onDragMove?: (objectId: string, x: number, y: number) => void;
   onDragEnd?: (objectId: string, x: number, y: number) => void;
@@ -24,8 +24,8 @@ const Rectangle: React.FC<RectangleProps> = ({
   currentUserId,
   users = {},
 }) => {
-  const handleClick = () => {
-    onClick?.(object.id);
+  const handleClick = (e: any) => {
+    onClick?.(object.id, e.evt?.shiftKey || false);
   };
 
   const handleDragStart = (e: any) => {

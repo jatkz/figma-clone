@@ -5,7 +5,7 @@ import type { TextObject, User } from '../types/canvas';
 interface TextObjectProps {
   textObject: TextObject;
   isSelected: boolean;
-  onSelect: (id: string) => Promise<void> | boolean;
+  onSelect: (id: string, shiftKey?: boolean) => Promise<void> | boolean;
   onDeselect: () => Promise<void> | void;
   onDragStart: (objectId: string) => boolean;
   onDragMove: (id: string, x: number, y: number) => void;
@@ -41,10 +41,12 @@ const TextObjectComponent: React.FC<TextObjectProps> = ({
       return; // Can't select shapes locked by others
     }
     
+    const shiftKey = e.evt?.shiftKey || false;
+    
     if (isSelected) {
       onDeselect();
     } else {
-      const canSelect = onSelect(textObject.id);
+      const canSelect = onSelect(textObject.id, shiftKey);
       if (!canSelect) {
         console.warn('Could not select text - lock acquisition failed');
       }

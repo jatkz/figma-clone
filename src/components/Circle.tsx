@@ -5,7 +5,7 @@ import type { CircleObject, User } from '../types/canvas';
 interface CircleProps {
   circle: CircleObject;
   isSelected: boolean;
-  onSelect: (id: string) => Promise<void> | boolean;
+  onSelect: (id: string, shiftKey?: boolean) => Promise<void> | boolean;
   onDeselect: () => Promise<void> | void;
   onDragStart: (objectId: string) => boolean;
   onDragMove: (id: string, x: number, y: number) => void;
@@ -37,10 +37,12 @@ const Circle: React.FC<CircleProps> = ({
       return; // Can't select shapes locked by others
     }
     
+    const shiftKey = e.evt?.shiftKey || false;
+    
     if (isSelected) {
       onDeselect();
     } else {
-      const canSelect = onSelect(circle.id);
+      const canSelect = onSelect(circle.id, shiftKey);
       if (!canSelect) {
         console.warn('Could not select circle - lock acquisition failed');
       }
