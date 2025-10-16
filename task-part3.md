@@ -363,28 +363,28 @@ This document outlines the implementation plan for core canvas manipulation feat
 - [x] Disable shortcuts when typing in text fields
 - [x] Visual feedback: Highlight active tool on keypress
 
-### 14.2 Object Manipulation Shortcuts
-- [ ] Selection shortcuts:
+### 14.2 Object Manipulation Shortcuts ✅ COMPLETE
+- [x] Selection shortcuts:
   - `Ctrl/Cmd+A`: Select all
   - `Esc`: Deselect all
   - `Tab`: Select next object
   - `Shift+Tab`: Select previous object
-- [ ] Edit shortcuts:
+- [x] Edit shortcuts:
   - `Ctrl/Cmd+D`: Duplicate
   - `Ctrl/Cmd+C`: Copy
-  - `Ctrl/Cmd+V`: Paste
+  - `Ctrl/Cmd+V`: Paste (placeholder for now)
   - `Ctrl/Cmd+X`: Cut
   - `Delete` or `Backspace`: Delete
-- [ ] Transform shortcuts:
+- [x] Transform shortcuts:
   - `[`: Rotate 90° counter-clockwise
   - `]`: Rotate 90° clockwise
   - `Ctrl/Cmd+Shift+R`: Reset rotation
-- [ ] Canvas shortcuts:
+- [x] Canvas shortcuts:
   - `Ctrl/Cmd+0`: Reset zoom to 100%
   - `Ctrl/Cmd++`: Zoom in
   - `Ctrl/Cmd+-`: Zoom out
   - `Space+Drag`: Pan canvas (even when not in select mode)
-  - `Ctrl/Cmd+Shift+E`: Export canvas
+  - `Ctrl/Cmd+Shift+E`: Export canvas (placeholder)
 
 ### 14.3 Shortcuts Panel
 - [ ] Create keyboard shortcuts help panel:

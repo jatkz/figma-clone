@@ -63,10 +63,18 @@ export interface CanvasRef {
   duplicate: () => void;
   deleteSelected: () => Promise<void>;
   clearSelection: () => Promise<void>;
+  selectAll: () => Promise<void>;
+  selectNext: () => Promise<void>;
+  selectPrevious: () => Promise<void>;
   rotateBy: (degrees: number) => void;
   resetRotation: () => void;
   isTextEditing: () => boolean;
   hasSelection: () => boolean;
+  getSelectedObjects: () => string[];
+  setZoom: (scale: number) => void;
+  zoomIn: () => void;
+  zoomOut: () => void;
+  resetZoom: () => void;
 }
 
 const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChange }, ref) => {
@@ -104,6 +112,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
 
   // Track if we're currently panning
   const [isPanning, setIsPanning] = useState(false);
+  const [isSpacePressed, setIsSpacePressed] = useState(false);
   const [lastPointerPosition, setLastPointerPosition] = useState({ x: 0, y: 0 });
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
 
@@ -567,11 +576,70 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     }
   }, [selectedObjectIds, releaseMultipleLocks]);
 
+  // Handle select all
+  const handleSelectAll = useCallback(async () => {
+    if (!user?.id) return;
+    
+    // Release current locks first
+    await releaseMultipleLocks(selectedObjectIds);
+    
+    // Try to acquire locks on all objects
+    const allObjectIds = objects.map(obj => obj.id);
+    const lockedIds = await acquireMultipleLocks(allObjectIds);
+    
+    setSelectedObjectIds(lockedIds);
+    
+    if (lockedIds.length > 0) {
+      toastFunction(`Selected ${lockedIds.length} of ${allObjectIds.length} objects`, 'success', 1500);
+    }
+  }, [user?.id, objects, selectedObjectIds, acquireMultipleLocks, releaseMultipleLocks, toastFunction]);
+
+  // Handle select next object
+  const handleSelectNext = useCallback(async () => {
+    if (!user?.id || objects.length === 0) return;
+    
+    const currentIndex = selectedObjectIds.length === 1 
+      ? objects.findIndex(obj => obj.id === selectedObjectIds[0])
+      : -1;
+    
+    const nextIndex = (currentIndex + 1) % objects.length;
+    const nextObject = objects[nextIndex];
+    
+    // Release current locks
+    await releaseMultipleLocks(selectedObjectIds);
+    
+    // Try to acquire lock on next object
+    const locked = await acquireMultipleLocks([nextObject.id]);
+    setSelectedObjectIds(locked);
+  }, [user?.id, objects, selectedObjectIds, acquireMultipleLocks, releaseMultipleLocks]);
+
+  // Handle select previous object
+  const handleSelectPrevious = useCallback(async () => {
+    if (!user?.id || objects.length === 0) return;
+    
+    const currentIndex = selectedObjectIds.length === 1 
+      ? objects.findIndex(obj => obj.id === selectedObjectIds[0])
+      : -1;
+    
+    const prevIndex = currentIndex <= 0 ? objects.length - 1 : currentIndex - 1;
+    const prevObject = objects[prevIndex];
+    
+    // Release current locks
+    await releaseMultipleLocks(selectedObjectIds);
+    
+    // Try to acquire lock on previous object
+    const locked = await acquireMultipleLocks([prevObject.id]);
+    setSelectedObjectIds(locked);
+  }, [user?.id, objects, selectedObjectIds, acquireMultipleLocks, releaseMultipleLocks]);
+
   // Expose functions to parent via ref
   useImperativeHandle(ref, () => ({
     duplicate: handleDuplicateObject,
     deleteSelected: handleDeleteSelected,
     clearSelection: handleClearSelection,
+    selectAll: handleSelectAll,
+    selectNext: handleSelectNext,
+    selectPrevious: handleSelectPrevious,
     rotateBy: (degrees: number) => {
       if (selectedObjectIds.length === 1) {
         rotateBy(degrees);
@@ -584,8 +652,63 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
       }
     },
     isTextEditing: () => editingTextId !== null,
-    hasSelection: () => selectedObjectIds.length > 0
-  }), [handleDuplicateObject, handleDeleteSelected, handleClearSelection, rotateBy, resetRotation, selectedObjectIds, editingTextId, toastFunction]);
+    hasSelection: () => selectedObjectIds.length > 0,
+    getSelectedObjects: () => selectedObjectIds,
+    setZoom: (scale: number) => {
+      setViewport(prev => ({ ...prev, scale: Math.max(0.1, Math.min(5, scale)) }));
+    },
+    zoomIn: () => {
+      setViewport(prev => ({ ...prev, scale: Math.min(5, prev.scale * 1.2) }));
+      toastFunction(`Zoom: ${Math.round(viewport.scale * 1.2 * 100)}%`, 'info', 1000);
+    },
+    zoomOut: () => {
+      setViewport(prev => ({ ...prev, scale: Math.max(0.1, prev.scale / 1.2) }));
+      toastFunction(`Zoom: ${Math.round(viewport.scale / 1.2 * 100)}%`, 'info', 1000);
+    },
+    resetZoom: () => {
+      setViewport(prev => ({ ...prev, scale: 1 }));
+      toastFunction('Zoom reset to 100%', 'success', 1500);
+    }
+  }), [handleDuplicateObject, handleDeleteSelected, handleClearSelection, handleSelectAll, handleSelectNext, handleSelectPrevious, rotateBy, resetRotation, selectedObjectIds, editingTextId, toastFunction, viewport]);
+
+  // Track Space key for pan mode (Space+Drag to pan)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && !isSpacePressed) {
+        // Don't activate if typing in input fields
+        const target = e.target as HTMLElement;
+        if (
+          target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable
+        ) {
+          return;
+        }
+        
+        // Don't activate during text editing
+        if (editingTextId) {
+          return;
+        }
+        
+        e.preventDefault();
+        setIsSpacePressed(true);
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        setIsSpacePressed(false);
+        setIsPanning(false); // Stop panning when space is released
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [isSpacePressed, editingTextId]);
 
   // Handle rectangle drag events (supports group movement for multi-select)
   const handleRectangleDragStart = useCallback((objectId: string) => {
@@ -728,6 +851,13 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
           const pos = stage.getPointerPosition();
           if (!pos) return;
 
+          // Space+Drag for panning (works with any tool)
+          if (isSpacePressed) {
+            setIsPanning(true);
+            setLastPointerPosition(pos);
+            return;
+          }
+
           if (activeTool === 'select') {
             // Release all selected objects' locks when clicking on empty area
             if (selectedObjectIds.length > 0) {
@@ -750,7 +880,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
             handleCreateText(pos.x, pos.y);
           }
         }
-      }, [activeTool, handleCreateRectangle, handleCreateCircle, handleCreateText, selectedObjectIds, releaseMultipleLocks]);
+      }, [activeTool, handleCreateRectangle, handleCreateCircle, handleCreateText, selectedObjectIds, releaseMultipleLocks, isSpacePressed]);
 
   // Handle mouse move for panning and cursor tracking
   const handleMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -896,8 +1026,10 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
         onWheel={handleWheel}
         draggable={false} // We handle dragging manually for better control
         style={{
-          cursor: (activeTool === 'rectangle' || activeTool === 'circle' || activeTool === 'text') ? 'crosshair' : 
-                  isPanning ? 'grabbing' : 'grab'
+          cursor: isPanning ? 'grabbing' : 
+                  isSpacePressed ? 'grab' :
+                  (activeTool === 'rectangle' || activeTool === 'circle' || activeTool === 'text') ? 'crosshair' : 
+                  'grab'
         }}
       >
         <Layer>

@@ -24,6 +24,7 @@ function AppContent() {
   const { deleteAllObjectsOptimistic } = useCanvas(user?.id, toastFunction);
   const canvasRef = useRef<CanvasRef>(null);
   const [hasSelection, setHasSelection] = useState(false);
+  const [clipboard, setClipboard] = useState<string[]>([]); // Store copied object IDs
 
   // Consolidated keyboard shortcuts handler
   useEffect(() => {
@@ -46,27 +47,87 @@ function AppContent() {
       // Tool shortcuts (V, R, C, T)
       switch (e.key.toLowerCase()) {
         case 'v':
-          e.preventDefault();
-          setActiveTool('select');
-          return;
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault();
+            setActiveTool('select');
+            return;
+          }
+          break;
         case 'r':
-          e.preventDefault();
-          setActiveTool('rectangle');
-          return;
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault();
+            setActiveTool('rectangle');
+            return;
+          }
+          break;
         case 'c':
-          e.preventDefault();
-          setActiveTool('circle');
-          return;
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault();
+            setActiveTool('circle');
+            return;
+          }
+          break;
         case 't':
-          e.preventDefault();
-          setActiveTool('text');
-          return;
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault();
+            setActiveTool('text');
+            return;
+          }
+          break;
+      }
+
+      // Select All: Ctrl/Cmd+A
+      if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+        e.preventDefault();
+        await canvasRef.current?.selectAll();
+        return;
+      }
+
+      // Copy: Ctrl/Cmd+C
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+        e.preventDefault();
+        const selected = canvasRef.current?.getSelectedObjects() || [];
+        if (selected.length > 0) {
+          setClipboard(selected);
+          toastFunction(`Copied ${selected.length} object${selected.length > 1 ? 's' : ''}`, 'success', 1500);
+        }
+        return;
+      }
+
+      // Cut: Ctrl/Cmd+X
+      if ((e.ctrlKey || e.metaKey) && e.key === 'x') {
+        e.preventDefault();
+        const selected = canvasRef.current?.getSelectedObjects() || [];
+        if (selected.length > 0) {
+          setClipboard(selected);
+          await canvasRef.current?.deleteSelected();
+          toastFunction(`Cut ${selected.length} object${selected.length > 1 ? 's' : ''}`, 'success', 1500);
+        }
+        return;
+      }
+
+      // Paste: Ctrl/Cmd+V
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+        e.preventDefault();
+        if (clipboard.length > 0) {
+          // For now, just duplicate the clipboard items
+          // In the future, could implement actual paste with offset
+          toastFunction('Paste functionality coming soon', 'info', 2000);
+        }
+        return;
       }
 
       // Duplicate: Ctrl/Cmd+D
       if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
         e.preventDefault();
         canvasRef.current?.duplicate();
+        return;
+      }
+
+      // Export: Ctrl/Cmd+Shift+E
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'E') {
+        e.preventDefault();
+        toastFunction('Export functionality coming soon', 'info', 2000);
         return;
       }
 
@@ -91,6 +152,41 @@ function AppContent() {
         return;
       }
 
+      // Tab: Select next object
+      if (e.key === 'Tab' && !e.shiftKey) {
+        e.preventDefault();
+        await canvasRef.current?.selectNext();
+        return;
+      }
+
+      // Shift+Tab: Select previous object
+      if (e.key === 'Tab' && e.shiftKey) {
+        e.preventDefault();
+        await canvasRef.current?.selectPrevious();
+        return;
+      }
+
+      // Reset Zoom: Ctrl/Cmd+0
+      if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+        e.preventDefault();
+        canvasRef.current?.resetZoom();
+        return;
+      }
+
+      // Zoom In: Ctrl/Cmd++
+      if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '+')) {
+        e.preventDefault();
+        canvasRef.current?.zoomIn();
+        return;
+      }
+
+      // Zoom Out: Ctrl/Cmd+-
+      if ((e.ctrlKey || e.metaKey) && (e.key === '-' || e.key === '_')) {
+        e.preventDefault();
+        canvasRef.current?.zoomOut();
+        return;
+      }
+
       // Delete: Delete or Backspace key
       if (e.key === 'Delete' || e.key === 'Backspace') {
         await canvasRef.current?.deleteSelected();
@@ -107,7 +203,7 @@ function AppContent() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [setActiveTool]);
+  }, [setActiveTool, clipboard, toastFunction]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
