@@ -126,6 +126,19 @@ const TextObjectComponent: React.FC<TextObjectProps> = ({
 
   return (
     <Group>
+      {/* Background color rectangle (behind text) */}
+      {textObject.backgroundColor && textObject.backgroundColor !== 'transparent' && (
+        <Rect
+          x={textObject.x}
+          y={textObject.y}
+          width={textWidth}
+          height={textHeight}
+          fill={textObject.backgroundColor}
+          rotation={textObject.rotation}
+          listening={false}
+        />
+      )}
+
       {/* Background rectangle for selection/lock indication */}
       {showBackground && (
         <Rect
@@ -155,7 +168,8 @@ const TextObjectComponent: React.FC<TextObjectProps> = ({
         fontFamily={textObject.fontFamily || 'Arial, sans-serif'}
         fontStyle={textObject.fontStyle || 'normal'}
         fontVariant={textObject.fontWeight || 'normal'}
-        fill={textObject.color}
+        textDecoration={textObject.textDecoration || 'none'}
+        fill={textObject.textColor || textObject.color}
         align={textObject.textAlign || 'left'}
         width={textObject.width}
         height={textObject.height}

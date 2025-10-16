@@ -14,6 +14,7 @@ import CircleComponent from './Circle';
 import TextObjectComponent from './TextObject';
 import ResizeHandles from './ResizeHandles';
 import RotationHandle from './RotationHandle';
+import TextFormattingToolbar from './TextFormattingToolbar';
 import { useResize } from '../hooks/useResize';
 import { useRotation } from '../hooks/useRotation';
 import { createNewRectangle, createNewCircle, createNewText, isWithinCanvasBounds, generateTempId } from '../utils/shapeFactory';
@@ -415,6 +416,19 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     
     // Note: Don't auto-select during creation (user is in creation mode)
   }, [user?.id, screenToCanvasCoords, createObjectOptimistic]);
+
+  // Handle text formatting updates
+  const handleTextFormattingUpdate = useCallback((textObjectId: string, updates: Partial<CanvasObject>) => {
+    if (!user?.id) {
+      return;
+    }
+
+    // Update the text object with new formatting
+    updateObjectOptimistic(textObjectId, {
+      ...updates,
+      modifiedBy: user.id
+    });
+  }, [user?.id, updateObjectOptimistic]);
 
   // Handle duplicate object(s) (Ctrl/Cmd+D) - Supports multi-select
   const handleDuplicateObject = useCallback(async () => {
@@ -826,7 +840,20 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
 
   return (
     <div className="w-full h-full bg-gray-100 overflow-hidden relative">
-
+      {/* Text Formatting Toolbar - shows when single text object is selected */}
+      {selectedObjectIds.length === 1 && (() => {
+        const selectedObject = objects.find(obj => obj.id === selectedObjectIds[0]);
+        if (selectedObject && selectedObject.type === 'text' && selectedObject.lockedBy === user?.id) {
+          return (
+            <TextFormattingToolbar
+              textObject={selectedObject}
+              onUpdateFormatting={(updates) => handleTextFormattingUpdate(selectedObject.id, updates)}
+              canEdit={true}
+            />
+          );
+        }
+        return null;
+      })()}
 
       <Stage
         ref={stageRef}

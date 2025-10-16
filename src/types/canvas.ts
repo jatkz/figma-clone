@@ -33,7 +33,10 @@ export interface TextObject extends BaseCanvasObject {
   fontFamily?: string;
   fontWeight?: 'normal' | 'bold';
   fontStyle?: 'normal' | 'italic';
+  textDecoration?: 'none' | 'underline';
   textAlign?: 'left' | 'center' | 'right';
+  textColor?: string; // Optional custom text color (defaults to base color field)
+  backgroundColor?: string; // Optional background color (defaults to 'transparent')
   width?: number; // For text wrapping
   height?: number; // Auto-calculated based on content
 }

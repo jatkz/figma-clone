@@ -63,6 +63,7 @@ export const createNewText = (
 ): TextObject => {
   const textWidth = text.length * fontSize * 0.6;
   const textHeight = fontSize * 1.2;
+  const color = getRandomColor();
   
   return {
     id: generateTempId(),
@@ -74,10 +75,13 @@ export const createNewText = (
     fontFamily: 'Arial, sans-serif',
     fontWeight: 'normal',
     fontStyle: 'normal',
+    textDecoration: 'none',
     textAlign: 'left',
+    textColor: color, // Use same color as base color
+    backgroundColor: 'transparent',
     width: textWidth,
     height: textHeight,
-    color: getRandomColor(),
+    color,
     rotation: 0,
     createdBy: userId,
     modifiedBy: userId,

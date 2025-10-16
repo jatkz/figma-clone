@@ -287,8 +287,8 @@ This document outlines the implementation plan for core canvas manipulation feat
 
 ## Phase 13: Text Formatting & Editing
 
-### 13.1 Text Formatting Controls
-- [ ] Add formatting toolbar when text is selected:
+### 13.1 Text Formatting Controls ✅ COMPLETE
+- [x] Add formatting toolbar when text is selected:
   - Font family dropdown (5-10 common fonts)
   - Font size slider/input (8px - 72px)
   - Bold toggle button
@@ -296,24 +296,24 @@ This document outlines the implementation plan for core canvas manipulation feat
   - Underline toggle button
   - Text color picker
   - Background color picker (optional)
-- [ ] Text alignment buttons:
+- [x] Text alignment buttons:
   - Left align
   - Center align
   - Right align
   - Justify (optional for MVP)
-- [ ] Formatting toolbar UI:
+- [x] Formatting toolbar UI:
   - Appears above selected text object
   - Stays visible while text is selected
   - Disappears on deselect
   - Tooltips for each button
-- [ ] Apply formatting to entire text object (no inline formatting for MVP)
-- [ ] Sync formatting changes to all users
-- [ ] Update text object schema:
+- [x] Apply formatting to entire text object (no inline formatting for MVP)
+- [x] Sync formatting changes to all users
+- [x] Update text object schema:
   - Add fontFamily, fontWeight, fontStyle, textDecoration fields
   - Add textAlign, textColor, backgroundColor fields
-- [ ] Test: Apply each formatting option
-- [ ] Test: Format AI-generated text objects
-- [ ] Test: Formatting persists after deselect/reselect
+- [x] Test: Apply each formatting option
+- [x] Test: Format AI-generated text objects
+- [x] Test: Formatting persists after deselect/reselect
 
 ### 13.2 Text Editing
 - [ ] Double-click text to enter edit mode:
