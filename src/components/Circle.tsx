@@ -57,27 +57,32 @@ const Circle: React.FC<CircleProps> = ({
   const handleDragMove = (e: any) => {
     if (!isLockedByCurrentUser) return;
     
-    const x = e.target.x();
-    const y = e.target.y();
+    // Konva reports center position, which matches our data model for circles
+    const centerX = e.target.x();
+    const centerY = e.target.y();
     
-    // Apply real-time visual correction for bounds
-    const constrainedX = Math.max(0, Math.min(5000 - circle.radius * 2, x));
-    const constrainedY = Math.max(0, Math.min(5000 - circle.radius * 2, y));
+    // Apply real-time visual correction for bounds (keep circle fully within canvas)
+    const constrainedX = Math.max(circle.radius, Math.min(5000 - circle.radius, centerX));
+    const constrainedY = Math.max(circle.radius, Math.min(5000 - circle.radius, centerY));
     
-    if (x !== constrainedX || y !== constrainedY) {
+    // If position was constrained, update Konva's visual position
+    if (centerX !== constrainedX || centerY !== constrainedY) {
       e.target.x(constrainedX);
       e.target.y(constrainedY);
     }
     
+    // Send center coordinates (matches our data model)
     onDragMove(circle.id, constrainedX, constrainedY);
   };
 
   const handleDragEnd = (e: any) => {
     if (!isLockedByCurrentUser) return;
     
-    const x = e.target.x();
-    const y = e.target.y();
-    onDragEnd(circle.id, x, y);
+    // Konva reports center position, which matches our data model for circles
+    const centerX = e.target.x();
+    const centerY = e.target.y();
+    
+    onDragEnd(circle.id, centerX, centerY);
   };
 
   const handleMouseEnter = (e: any) => {
@@ -118,8 +123,8 @@ const Circle: React.FC<CircleProps> = ({
     <Group>
       {/* Main circle */}
       <KonvaCircle
-        x={circle.x + circle.radius} // Konva circles use center positioning
-        y={circle.y + circle.radius}
+        x={circle.x} // Circle x,y now stores center position
+        y={circle.y}
         radius={circle.radius}
         fill={circle.color}
         stroke={strokeColor}
@@ -142,8 +147,8 @@ const Circle: React.FC<CircleProps> = ({
         <Group>
           {/* Username label */}
           <Text
-            x={circle.x + circle.radius - 30}
-            y={circle.y - 20}
+            x={circle.x - 30}
+            y={circle.y - circle.radius - 20}
             text={lockingUser.displayName}
             fontSize={12}
             fill="#fff"
@@ -161,8 +166,8 @@ const Circle: React.FC<CircleProps> = ({
         <Group>
           {/* Editing indicator */}
           <Text
-            x={circle.x + circle.radius - 15}
-            y={circle.y - 20}
+            x={circle.x - 15}
+            y={circle.y - circle.radius - 20}
             text="✏️"
             fontSize={12}
             fill="#00cc66"

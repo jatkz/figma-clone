@@ -1,8 +1,8 @@
 // Base interface for all canvas objects
 export interface BaseCanvasObject {
   id: string;
-  x: number; // constrained 0-5000
-  y: number; // constrained 0-5000
+  x: number; // For rectangles/text: top-left corner. For circles: center point. (constrained 0-5000)
+  y: number; // For rectangles/text: top-left corner. For circles: center point. (constrained 0-5000)
   color: string; // randomly assigned
   rotation: number;
   createdBy: string;

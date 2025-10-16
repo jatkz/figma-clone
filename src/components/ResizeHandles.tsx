@@ -1,6 +1,7 @@
 import React from 'react';
 import { Rect, Group } from 'react-konva';
 import type { CanvasObject } from '../types/canvas';
+import { getShapeBounds } from '../utils/shapeUtils';
 
 interface ResizeHandlesProps {
   object: CanvasObject;
@@ -43,6 +44,10 @@ const ResizeHandles: React.FC<ResizeHandlesProps> = ({
 
   const { width, height } = getObjectDimensions();
 
+  // Get the top-left corner of the bounding box for positioning
+  // For circles, this converts center to top-left; for rectangles/text, it's the same
+  const bounds = getShapeBounds(object);
+
   // Handle positions relative to object
   // Stage 2: All 8 handles (4 corners + 4 sides)
   const handles: Array<{ handle: ResizeHandle; x: number; y: number; cursor: string }> = [
@@ -80,8 +85,8 @@ const ResizeHandles: React.FC<ResizeHandlesProps> = ({
 
   return (
     <Group
-      x={object.x}
-      y={object.y}
+      x={bounds.x}
+      y={bounds.y}
       rotation={object.rotation}
     >
       {handles.map(({ handle, x, y, cursor }) => (

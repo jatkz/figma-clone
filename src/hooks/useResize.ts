@@ -195,12 +195,21 @@ export const useResize = ({
       updateData.width = newWidth;
       updateData.height = newHeight;
     } else if (selectedObject.type === 'circle') {
-      // Circle: Maintain circular shape (use larger dimension for both)
+      // Circle: Maintain circular shape (use larger dimension for uniform scaling)
       const size = Math.max(newWidth, newHeight);
-      updateData.radius = size / 2;
-      // Center the circle in the resize area
-      updateData.x = newX + (newWidth - size) / 2 + size / 2;
-      updateData.y = newY + (newHeight - size) / 2 + size / 2;
+      const newRadius = size / 2;
+      
+      // Update radius
+      updateData.radius = newRadius;
+      
+      // For circle, x/y represents center, so we need to update center position based on handle
+      // Calculate where the center should be based on the resize operation
+      const centerX = newX + newWidth / 2;
+      const centerY = newY + newHeight / 2;
+      
+      updateData.x = centerX;
+      updateData.y = centerY;
+      
       newWidth = size; // For tooltip
       newHeight = size; // For tooltip
     } else if (selectedObject.type === 'text') {

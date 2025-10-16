@@ -48,9 +48,22 @@ export const getShapeDimensions = (shape: CanvasObject): { width: number; height
 
 /**
  * Get the bounding box of a shape (x, y, width, height)
+ * Returns top-left corner coordinates for all shapes
  */
 export const getShapeBounds = (shape: CanvasObject): { x: number; y: number; width: number; height: number } => {
   const dimensions = getShapeDimensions(shape);
+  
+  if (shape.type === 'circle') {
+    // Circle stores center position, convert to top-left of bounding box
+    return {
+      x: shape.x - shape.radius,
+      y: shape.y - shape.radius,
+      width: dimensions.width,
+      height: dimensions.height,
+    };
+  }
+  
+  // Rectangles and text store top-left position
   return {
     x: shape.x,
     y: shape.y,
@@ -74,9 +87,8 @@ export const isPointInShape = (shape: CanvasObject, x: number, y: number): boole
              
     case 'circle':
       // Circle hit test - check distance from center
-      const centerX = shape.x + shape.radius;
-      const centerY = shape.y + shape.radius;
-      const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
+      // Circle x,y is already the center position
+      const distance = Math.sqrt(Math.pow(x - shape.x, 2) + Math.pow(y - shape.y, 2));
       return distance <= shape.radius;
       
     default:
@@ -92,10 +104,10 @@ export const getShapeCenter = (shape: CanvasObject): { x: number; y: number } =>
   
   switch (shape.type) {
     case 'circle':
-      // Circles are positioned by top-left, but center is offset by radius
+      // Circle x,y is already the center position
       return {
-        x: shape.x + shape.radius,
-        y: shape.y + shape.radius,
+        x: shape.x,
+        y: shape.y,
       };
     default:
       // Rectangles and text use top-left positioning

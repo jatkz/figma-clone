@@ -31,13 +31,15 @@ export const createNewRectangle = (x: number, y: number, userId: string): Rectan
 
 /**
  * Create a new circle object
+ * Note: x, y represent the CENTER of the circle
  */
 export const createNewCircle = (x: number, y: number, userId: string, radius = 50): CircleObject => {
   return {
     id: generateTempId(),
     type: 'circle',
-    x: Math.max(0, Math.min(5000 - radius * 2, x)),
-    y: Math.max(0, Math.min(5000 - radius * 2, y)),
+    // Circle x,y is center position - constrain so circle stays within canvas
+    x: Math.max(radius, Math.min(5000 - radius, x)),
+    y: Math.max(radius, Math.min(5000 - radius, y)),
     radius,
     color: getRandomColor(),
     rotation: 0,
