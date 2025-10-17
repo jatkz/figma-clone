@@ -323,7 +323,6 @@ export const deleteObject = async (objectId: string): Promise<void> => {
  */
 export const deleteAllObjects = async (): Promise<number> => {
   try {
-    console.log('🗑️ Deleting all objects from Firestore...');
     const objectsCollectionRef = collection(db, OBJECTS_COLLECTION_PATH);
     const snapshot = await getDocs(objectsCollectionRef);
     
@@ -331,7 +330,6 @@ export const deleteAllObjects = async (): Promise<number> => {
     await Promise.all(deletePromises);
     
     const deletedCount = snapshot.docs.length;
-    console.log(`✅ Deleted ${deletedCount} objects from Firestore`);
     return deletedCount;
   } catch (error) {
     console.error('Error deleting all objects:', error);
@@ -350,8 +348,6 @@ export const deleteAllObjects = async (): Promise<number> => {
  */
 export const createObjectsBatch = async (objects: CanvasObjectInput[]): Promise<CanvasObject[]> => {
   try {
-    console.log(`Creating ${objects.length} objects in batch...`);
-    
     const createdObjects: CanvasObject[] = [];
     const objectsCollectionRef = collection(db, OBJECTS_COLLECTION_PATH);
     
@@ -369,7 +365,6 @@ export const createObjectsBatch = async (objects: CanvasObjectInput[]): Promise<
       } as CanvasObject);
     }
     
-    console.log(`Batch creation completed: ${createdObjects.length} objects created`);
     return createdObjects;
   } catch (error) {
     console.error('Error in batch object creation:', error);
@@ -385,8 +380,6 @@ export const createObjectsBatch = async (objects: CanvasObjectInput[]): Promise<
  */
 export const acquireLock = async (objectId: string, userId: string): Promise<boolean> => {
   try {
-    console.log(`🔒 Attempting to acquire lock on ${objectId} for user ${userId}`);
-    
     const objectDocRef = doc(db, OBJECTS_COLLECTION_PATH, objectId);
     
     const result = await runTransaction(db, async (transaction) => {
@@ -405,11 +398,8 @@ export const acquireLock = async (objectId: string, userId: string): Promise<boo
         const LOCK_TIMEOUT = 30 * 1000; // 30 seconds
         
         if (lockAge < LOCK_TIMEOUT) {
-          console.log(`❌ Object ${objectId} is locked by ${currentData.lockedBy}`);
           return false; // Lock is still valid
         }
-        
-        console.log(`⏰ Lock on ${objectId} has expired, acquiring for ${userId}`);
       }
       
       // Acquire the lock
@@ -420,7 +410,6 @@ export const acquireLock = async (objectId: string, userId: string): Promise<boo
       };
       
       transaction.update(objectDocRef, lockData);
-      console.log(`✅ Lock acquired on ${objectId} for user ${userId}`);
       return true;
     });
     
@@ -444,15 +433,12 @@ export const acquireLock = async (objectId: string, userId: string): Promise<boo
  */
 export const releaseLock = async (objectId: string, userId: string): Promise<boolean> => {
   try {
-    console.log(`🔓 Attempting to release lock on ${objectId} for user ${userId}`);
-    
     const objectDocRef = doc(db, OBJECTS_COLLECTION_PATH, objectId);
     
     const result = await runTransaction(db, async (transaction) => {
       const objectDoc = await transaction.get(objectDocRef);
       
       if (!objectDoc.exists()) {
-        console.warn(`Object with ID ${objectId} not found, considering lock released`);
         return true; // Object doesn't exist, so lock is effectively released
       }
       
@@ -460,7 +446,6 @@ export const releaseLock = async (objectId: string, userId: string): Promise<boo
       
       // Check if user owns the lock
       if (currentData.lockedBy !== userId) {
-        console.warn(`❌ User ${userId} does not own lock on ${objectId} (owned by ${currentData.lockedBy})`);
         return false;
       }
       
@@ -472,7 +457,6 @@ export const releaseLock = async (objectId: string, userId: string): Promise<boo
       };
       
       transaction.update(objectDocRef, unlockData);
-      console.log(`✅ Lock released on ${objectId} by user ${userId}`);
       return true;
     });
     
@@ -508,8 +492,6 @@ export const releaseExpiredLocks = async (userId: string): Promise<number> => {
       // Check if lock is expired
       const lockAge = now - (objectData.lockedAt || 0);
       if (lockAge > LOCK_TIMEOUT) {
-        console.log(`⏰ Releasing expired lock on ${docSnapshot.id} (${lockAge}ms old)`);
-        
         try {
           const success = await releaseLock(docSnapshot.id, objectData.lockedBy);
           if (success) {
@@ -522,10 +504,6 @@ export const releaseExpiredLocks = async (userId: string): Promise<number> => {
     });
 
     await Promise.all(promises);
-    
-    if (releasedCount > 0) {
-      console.log(`✅ Released ${releasedCount} expired locks`);
-    }
     
     return releasedCount;
   } catch (error) {
@@ -618,7 +596,6 @@ export const cleanupStaleCursors = async (excludeUserId: string): Promise<number
       
       // Skip current user and check if cursor is stale
       if (userId !== excludeUserId && cursorData.lastSeen < staleThreshold) {
-        console.log(`⏰ Removing stale cursor for user ${userId}`);
         try {
           await deleteDoc(docSnapshot.ref);
           cleanedCount++;
@@ -629,11 +606,7 @@ export const cleanupStaleCursors = async (excludeUserId: string): Promise<number
     });
     
     await Promise.all(promises);
-    
-    if (cleanedCount > 0) {
-      console.log(`✅ Cleaned up ${cleanedCount} stale cursors`);
-    }
-    
+
     return cleanedCount;
   } catch (error) {
     console.error('Error cleaning up stale cursors:', error);
