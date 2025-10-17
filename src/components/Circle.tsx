@@ -5,6 +5,7 @@ import type { CircleObject, User } from '../types/canvas';
 interface CircleProps {
   circle: CircleObject;
   isSelected: boolean;
+  isFilterPreview?: boolean;
   onSelect: (id: string, shiftKey?: boolean) => Promise<void> | boolean;
   onDeselect: () => Promise<void> | void;
   onDragStart: (objectId: string) => boolean;
@@ -17,6 +18,7 @@ interface CircleProps {
 const Circle: React.FC<CircleProps> = ({
   circle,
   isSelected,
+  isFilterPreview = false,
   onSelect,
   onDeselect,
   onDragStart,
@@ -143,6 +145,20 @@ const Circle: React.FC<CircleProps> = ({
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       />
+
+      {/* Filter preview highlight (only show when object matches filter and not selected) */}
+      {isFilterPreview && (
+        <KonvaCircle
+          x={circle.x}
+          y={circle.y}
+          radius={circle.radius + 2}
+          fill="rgba(59, 130, 246, 0.15)"
+          stroke="#3B82F6"
+          strokeWidth={2}
+          dash={[6, 3]}
+          listening={false}
+        />
+      )}
 
       {/* Lock indicator for objects locked by others */}
       {isLockedByOther && lockingUser && (

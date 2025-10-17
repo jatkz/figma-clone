@@ -6,6 +6,7 @@ interface TextObjectProps {
   textObject: TextObject;
   isSelected: boolean;
   isEditing: boolean;
+  isFilterPreview?: boolean;
   onSelect: (id: string, shiftKey?: boolean) => Promise<void> | boolean;
   onDeselect: () => Promise<void> | void;
   onDragStart: (objectId: string) => boolean;
@@ -20,6 +21,7 @@ const TextObjectComponent: React.FC<TextObjectProps> = ({
   textObject,
   isSelected,
   isEditing,
+  isFilterPreview = false,
   onSelect,
   onDeselect,
   onDragStart,
@@ -202,6 +204,22 @@ const TextObjectComponent: React.FC<TextObjectProps> = ({
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       />
+
+      {/* Filter preview highlight (only show when object matches filter and not selected) */}
+      {isFilterPreview && (
+        <Rect
+          x={textObject.x - 4}
+          y={textObject.y - 4}
+          width={textWidth + 8}
+          height={textHeight + 8}
+          fill="rgba(59, 130, 246, 0.15)"
+          stroke="#3B82F6"
+          strokeWidth={2}
+          dash={[6, 3]}
+          rotation={textObject.rotation}
+          listening={false}
+        />
+      )}
 
       {/* Lock indicator for objects locked by others */}
       {isLockedByOther && lockingUser && (

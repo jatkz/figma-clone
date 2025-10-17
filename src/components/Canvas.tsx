@@ -71,6 +71,7 @@ interface CanvasProps {
   activeTool: ToolType;
   onSelectionChange?: (hasSelection: boolean) => void;
   magicWandTolerance?: number;
+  filterPreviewIds?: string[];
 }
 
 export interface CanvasRef {
@@ -82,6 +83,7 @@ export interface CanvasRef {
   selectPrevious: () => Promise<void>;
   selectInverse: () => Promise<void>;
   selectByType: (objectType: 'rectangle' | 'circle' | 'text', addToSelection?: boolean) => Promise<void>;
+  selectByIds: (objectIds: string[]) => Promise<void>;
   rotateBy: (degrees: number) => void;
   resetRotation: () => void;
   isTextEditing: () => boolean;
@@ -95,7 +97,7 @@ export interface CanvasRef {
   generatePreview: (mode: 'viewport' | 'entire' | 'selected') => string | null;
 }
 
-const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChange, magicWandTolerance = 15 }, ref) => {
+const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChange, magicWandTolerance = 15, filterPreviewIds = [] }, ref) => {
   const stageRef = useRef<Konva.Stage>(null);
   const { user } = useAuth();
   
@@ -913,6 +915,34 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     }
   }, [user?.id, objects, selectedObjectIds, releaseMultipleLocks, acquireMultipleLocks, toastFunction]);
 
+  // Handle select by IDs (for filter panel)
+  const handleSelectByIds = useCallback(async (objectIds: string[]) => {
+    if (!user?.id) return;
+    
+    if (objectIds.length === 0) {
+      toastFunction('No objects to select', 'info', 1500);
+      return;
+    }
+    
+    // Release current locks
+    await releaseMultipleLocks(selectedObjectIds);
+    
+    // Try to acquire locks on the specified objects
+    const lockedIds = await acquireMultipleLocks(objectIds);
+    setSelectedObjectIds(lockedIds);
+    
+    // Show feedback
+    if (lockedIds.length > 0) {
+      const totalCount = objectIds.length;
+      if (lockedIds.length === totalCount) {
+        toastFunction(`Selected ${lockedIds.length} object${lockedIds.length > 1 ? 's' : ''}`, 'success', 1500);
+      } else {
+        const lockedCount = totalCount - lockedIds.length;
+        toastFunction(`Selected ${lockedIds.length} of ${totalCount} objects. ${lockedCount} locked by others`, 'warning', 2000);
+      }
+    }
+  }, [user?.id, selectedObjectIds, acquireMultipleLocks, releaseMultipleLocks, toastFunction]);
+
   // Expose functions to parent via ref
   useImperativeHandle(ref, () => ({
     duplicate: handleDuplicateObject,
@@ -923,6 +953,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     selectPrevious: handleSelectPrevious,
     selectInverse: handleSelectInverse,
     selectByType: handleSelectByType,
+    selectByIds: handleSelectByIds,
     rotateBy: (degrees: number) => {
       if (selectedObjectIds.length === 1) {
         rotateBy(degrees);
@@ -992,7 +1023,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
       
       return generatePreview(params, mode);
     }
-  }), [handleDuplicateObject, handleDeleteSelected, handleClearSelection, handleSelectAll, handleSelectNext, handleSelectPrevious, handleSelectInverse, handleSelectByType, rotateBy, resetRotation, selectedObjectIds, editingTextId, toastFunction, viewport, objects, stageRef]);
+  }), [handleDuplicateObject, handleDeleteSelected, handleClearSelection, handleSelectAll, handleSelectNext, handleSelectPrevious, handleSelectInverse, handleSelectByType, handleSelectByIds, rotateBy, resetRotation, selectedObjectIds, editingTextId, toastFunction, viewport, objects, stageRef]);
 
   // Track Space key for pan mode (Space+Drag to pan) and Cmd/Ctrl for snap override
   useEffect(() => {
@@ -1448,6 +1479,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
             
             const sharedProps = {
               isSelected: selectedObjectIds.includes(object.id),
+              isFilterPreview: filterPreviewIds.includes(object.id) && !selectedObjectIds.includes(object.id),
               onSelect: handleRectangleClick,
               onDeselect: async () => {
                 if (selectedObjectIds.length > 0) {

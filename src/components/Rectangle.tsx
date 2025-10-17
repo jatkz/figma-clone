@@ -6,6 +6,7 @@ import { constrainToBounds } from '../utils/constrainToBounds';
 interface RectangleProps {
   object: RectangleObject;
   isSelected?: boolean;
+  isFilterPreview?: boolean;
   onClick?: (objectId: string, shiftKey: boolean) => void;
   onDragStart?: (objectId: string) => boolean; // Now returns boolean to indicate if drag should be allowed
   onDragMove?: (objectId: string, x: number, y: number) => void;
@@ -17,6 +18,7 @@ interface RectangleProps {
 const Rectangle: React.FC<RectangleProps> = ({
   object,
   isSelected = false,
+  isFilterPreview = false,
   onClick,
   onDragStart,
   onDragMove,
@@ -124,6 +126,22 @@ const Rectangle: React.FC<RectangleProps> = ({
           rotation={object.rotation}
           dash={[4, 4]}
           listening={false} // This rect shouldn't capture events
+        />
+      )}
+
+      {/* Filter preview highlight (only show when object matches filter and not selected) */}
+      {isFilterPreview && (
+        <Rect
+          x={object.x - 2}
+          y={object.y - 2}
+          width={object.width + 4}
+          height={object.height + 4}
+          fill="rgba(59, 130, 246, 0.15)"
+          stroke="#3B82F6"
+          strokeWidth={2}
+          rotation={object.rotation}
+          dash={[6, 3]}
+          listening={false}
         />
       )}
 

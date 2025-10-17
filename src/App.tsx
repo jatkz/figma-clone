@@ -4,6 +4,7 @@ import LogoutButton from './components/LogoutButton';
 import Canvas, { type CanvasRef } from './components/Canvas';
 import ToolPanel, { useToolState } from './components/ToolPanel';
 import ToolOptionsPanel from './components/ToolOptionsPanel';
+import SelectionFilterPanel from './components/SelectionFilterPanel';
 import PresenceIndicator from './components/PresenceIndicator';
 import UserList from './components/UserList';
 import AIChat from './components/AIChat';
@@ -26,10 +27,12 @@ function AppContent() {
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showSelectMenu, setShowSelectMenu] = useState(false);
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const [filterPreviewIds, setFilterPreviewIds] = useState<string[]>([]);
   const { toasts, removeToast } = useToastContext();
   const { user } = useAuth();
   const toastFunction = createToastFunction(useToastContext());
-  const { deleteAllObjectsOptimistic } = useCanvas(user?.id, toastFunction);
+  const { objects, deleteAllObjectsOptimistic } = useCanvas(user?.id, toastFunction);
   const canvasRef = useRef<CanvasRef>(null);
   const [hasSelection, setHasSelection] = useState(false);
   const [clipboard, setClipboard] = useState<string[]>([]); // Store copied object IDs
@@ -366,6 +369,16 @@ function AppContent() {
                           >
                             🔄 Select Inverse <span className="text-gray-400 text-xs ml-2">Ctrl+Shift+I</span>
                           </button>
+                          <div className="border-t border-gray-200 my-1" />
+                          <button
+                            onClick={() => {
+                              setShowFilterPanel(true);
+                              setShowSelectMenu(false);
+                            }}
+                            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors"
+                          >
+                            🎛️ Advanced Filters
+                          </button>
                         </div>
                       </>
                     )}
@@ -432,12 +445,13 @@ function AppContent() {
             {/* Canvas Area */}
             <div className="flex-1 p-4 pl-0 pr-0">
               <div className="bg-white rounded-lg shadow h-full mr-4">
-                <Canvas 
-                  ref={canvasRef}
-                  activeTool={activeTool}
-                  onSelectionChange={setHasSelection}
-                  magicWandTolerance={magicWandTolerance}
-                />
+          <Canvas
+            ref={canvasRef}
+            activeTool={activeTool}
+            onSelectionChange={setHasSelection}
+            magicWandTolerance={magicWandTolerance}
+            filterPreviewIds={filterPreviewIds}
+          />
               </div>
             </div>
           </div>
@@ -534,6 +548,25 @@ function AppContent() {
           onExport={handleExport}
           hasSelection={hasSelection}
           canvasRef={canvasRef}
+        />
+
+        {/* Selection Filter Panel */}
+        <SelectionFilterPanel
+          isOpen={showFilterPanel}
+          onClose={() => {
+            setShowFilterPanel(false);
+            setFilterPreviewIds([]);
+          }}
+          objects={objects}
+          currentUserId={user?.id}
+          onPreview={(ids) => setFilterPreviewIds(ids)}
+          onApply={async (ids) => {
+            // Select the filtered objects via canvas
+            setFilterPreviewIds([]);
+            if (ids.length > 0) {
+              await canvasRef.current?.selectByIds?.(ids);
+            }
+          }}
         />
       </ProtectedRoute>
     </div>
