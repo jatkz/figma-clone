@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 interface Shortcut {
   keys: string[];
   description: string;
-  category: 'Tools' | 'Selection' | 'Editing' | 'Transform' | 'Canvas' | 'General';
+  category: 'Tools' | 'Selection' | 'Editing' | 'Alignment' | 'Transform' | 'Canvas' | 'General';
 }
 
 const shortcuts: Shortcut[] = [
@@ -34,10 +34,17 @@ const shortcuts: Shortcut[] = [
   { keys: ['Delete'], description: 'Delete selected objects', category: 'Editing' },
   { keys: ['Backspace'], description: 'Delete selected objects', category: 'Editing' },
   
+  // Alignment
+  { keys: ['Ctrl', 'Shift', 'L'], description: 'Align objects left', category: 'Alignment' },
+  { keys: ['Ctrl', 'Shift', 'H'], description: 'Center objects horizontally', category: 'Alignment' },
+  { keys: ['Ctrl', 'Shift', 'R'], description: 'Align objects right', category: 'Alignment' },
+  { keys: ['Ctrl', 'Shift', 'T'], description: 'Align objects top', category: 'Alignment' },
+  { keys: ['Ctrl', 'Shift', 'M'], description: 'Center objects vertically', category: 'Alignment' },
+  { keys: ['Ctrl', 'Shift', 'B'], description: 'Align objects bottom', category: 'Alignment' },
+  
   // Transform
   { keys: ['['], description: 'Rotate 90° counter-clockwise', category: 'Transform' },
   { keys: [']'], description: 'Rotate 90° clockwise', category: 'Transform' },
-  { keys: ['Ctrl', 'Shift', 'R'], description: 'Reset rotation to 0°', category: 'Transform' },
   
   // Canvas
   { keys: ['Ctrl', '0'], description: 'Reset zoom to 100%', category: 'Canvas' },
@@ -102,10 +109,11 @@ const ShortcutsPanel: React.FC<ShortcutsPanelProps> = ({ isOpen, onClose }) => {
     return acc;
   }, {} as Record<string, Shortcut[]>);
 
-  const categories: Array<'Tools' | 'Selection' | 'Editing' | 'Transform' | 'Canvas' | 'General'> = [
+  const categories: Array<'Tools' | 'Selection' | 'Editing' | 'Alignment' | 'Transform' | 'Canvas' | 'General'> = [
     'Tools',
     'Selection',
     'Editing',
+    'Alignment',
     'Transform',
     'Canvas',
     'General',

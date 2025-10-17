@@ -34,6 +34,7 @@ import SnapGuides from './SnapGuides';
 import Cursor from './Cursor';
 import { isObjectInLasso, shouldCloseLasso, simplifyPath } from '../utils/lassoUtils';
 import { findObjectsByColor } from '../utils/colorUtils';
+import { alignObjects, distributeObjects, alignToCanvas, type AlignmentType, type DistributionType } from '../utils/alignmentUtils';
 
 // Throttle utility for cursor updates
 const throttle = <T extends (...args: any[]) => void>(func: T, delay: number): T => {
@@ -84,6 +85,9 @@ export interface CanvasRef {
   selectInverse: () => Promise<void>;
   selectByType: (objectType: 'rectangle' | 'circle' | 'text', addToSelection?: boolean) => Promise<void>;
   selectByIds: (objectIds: string[]) => Promise<void>;
+  align: (type: AlignmentType) => Promise<void>;
+  distribute: (type: DistributionType) => Promise<void>;
+  alignToCanvasCenter: (type: 'center' | 'left' | 'right' | 'top' | 'bottom') => Promise<void>;
   rotateBy: (degrees: number) => void;
   resetRotation: () => void;
   isTextEditing: () => boolean;
@@ -943,6 +947,105 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     }
   }, [user?.id, selectedObjectIds, acquireMultipleLocks, releaseMultipleLocks, toastFunction]);
 
+  // Handle alignment
+  const handleAlign = useCallback(async (alignmentType: AlignmentType) => {
+    if (!user?.id || selectedObjectIds.length < 2) return;
+
+    // Get selected objects
+    const selectedObjects = objects.filter(obj => selectedObjectIds.includes(obj.id));
+    
+    if (selectedObjects.length < 2) {
+      toastFunction('Select at least 2 objects to align', 'info', 1500);
+      return;
+    }
+
+    // Calculate new positions
+    const updates = alignObjects(selectedObjects, alignmentType);
+
+    // Apply updates to Firebase
+    await Promise.all(
+      Array.from(updates.entries()).map(([objectId, newPos]) =>
+        updateObjectOptimistic(objectId, newPos)
+      )
+    );
+
+    // Show feedback
+    const alignmentNames: Record<AlignmentType, string> = {
+      'left': 'left',
+      'center-horizontal': 'center horizontally',
+      'right': 'right',
+      'top': 'top',
+      'center-vertical': 'center vertically',
+      'bottom': 'bottom'
+    };
+    toastFunction(`Aligned ${updates.size} objects ${alignmentNames[alignmentType]}`, 'success', 1500);
+  }, [user?.id, selectedObjectIds, objects, updateObjectOptimistic, toastFunction]);
+
+  // Handle distribution
+  const handleDistribute = useCallback(async (distributionType: DistributionType) => {
+    if (!user?.id || selectedObjectIds.length < 3) return;
+
+    // Get selected objects
+    const selectedObjects = objects.filter(obj => selectedObjectIds.includes(obj.id));
+    
+    if (selectedObjects.length < 3) {
+      toastFunction('Select at least 3 objects to distribute', 'info', 1500);
+      return;
+    }
+
+    // Calculate new positions
+    const updates = distributeObjects(selectedObjects, distributionType);
+
+    // Apply updates to Firebase
+    await Promise.all(
+      Array.from(updates.entries()).map(([objectId, newPos]) =>
+        updateObjectOptimistic(objectId, newPos)
+      )
+    );
+
+    // Show feedback
+    const distributionNames: Record<DistributionType, string> = {
+      'horizontal-edges': 'horizontally',
+      'horizontal-centers': 'centers horizontally',
+      'vertical-edges': 'vertically',
+      'vertical-centers': 'centers vertically'
+    };
+    toastFunction(`Distributed ${updates.size} objects ${distributionNames[distributionType]}`, 'success', 1500);
+  }, [user?.id, selectedObjectIds, objects, updateObjectOptimistic, toastFunction]);
+
+  // Handle align to canvas
+  const handleAlignToCanvas = useCallback(async (alignType: 'center' | 'left' | 'right' | 'top' | 'bottom') => {
+    if (!user?.id || selectedObjectIds.length === 0) return;
+
+    // Get selected objects
+    const selectedObjects = objects.filter(obj => selectedObjectIds.includes(obj.id));
+    
+    if (selectedObjects.length === 0) {
+      toastFunction('Select objects to align to canvas', 'info', 1500);
+      return;
+    }
+
+    // Calculate new positions
+    const updates = alignToCanvas(selectedObjects, CANVAS_WIDTH, CANVAS_HEIGHT, alignType);
+
+    // Apply updates to Firebase
+    await Promise.all(
+      Array.from(updates.entries()).map(([objectId, newPos]) =>
+        updateObjectOptimistic(objectId, newPos)
+      )
+    );
+
+    // Show feedback
+    const alignNames: Record<string, string> = {
+      'center': 'to canvas center',
+      'left': 'to canvas left',
+      'right': 'to canvas right',
+      'top': 'to canvas top',
+      'bottom': 'to canvas bottom'
+    };
+    toastFunction(`Aligned ${updates.size} objects ${alignNames[alignType]}`, 'success', 1500);
+  }, [user?.id, selectedObjectIds, objects, updateObjectOptimistic, toastFunction]);
+
   // Expose functions to parent via ref
   useImperativeHandle(ref, () => ({
     duplicate: handleDuplicateObject,
@@ -954,6 +1057,9 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     selectInverse: handleSelectInverse,
     selectByType: handleSelectByType,
     selectByIds: handleSelectByIds,
+    align: handleAlign,
+    distribute: handleDistribute,
+    alignToCanvasCenter: handleAlignToCanvas,
     rotateBy: (degrees: number) => {
       if (selectedObjectIds.length === 1) {
         rotateBy(degrees);
@@ -1023,7 +1129,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
       
       return generatePreview(params, mode);
     }
-  }), [handleDuplicateObject, handleDeleteSelected, handleClearSelection, handleSelectAll, handleSelectNext, handleSelectPrevious, handleSelectInverse, handleSelectByType, handleSelectByIds, rotateBy, resetRotation, selectedObjectIds, editingTextId, toastFunction, viewport, objects, stageRef]);
+  }), [handleDuplicateObject, handleDeleteSelected, handleClearSelection, handleSelectAll, handleSelectNext, handleSelectPrevious, handleSelectInverse, handleSelectByType, handleSelectByIds, handleAlign, handleDistribute, handleAlignToCanvas, rotateBy, resetRotation, selectedObjectIds, editingTextId, toastFunction, viewport, objects, stageRef]);
 
   // Track Space key for pan mode (Space+Drag to pan) and Cmd/Ctrl for snap override
   useEffect(() => {

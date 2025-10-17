@@ -20,6 +20,8 @@ A real-time collaborative canvas application built with React, TypeScript, and K
 - **Magic Wand** - Select all objects with matching colors (with adjustable tolerance)
 - **Advanced Selection Tools** - Select by type (all rectangles/circles/text), select inverse
 - **Selection Filters** - Filter and select objects by type, color, size, and creator with live preview
+- **Alignment Tools** - Align multiple objects (left, right, center, top, bottom), align to canvas
+- **Distribution Tools** - Distribute objects with equal spacing horizontally or vertically
 - **Smart Guides** - Alignment guides with automatic snapping
 - **Snap-to-Grid** - Toggle-able grid snapping (10px grid)
 - **Zoom & Pan** - Navigate large canvases with mouse wheel zoom and space+drag panning
@@ -47,6 +49,7 @@ A real-time collaborative canvas application built with React, TypeScript, and K
 - **Tool Selection** - V (select), L (lasso), W (magic wand), R (rectangle), C (circle), T (text)
 - **Object Operations** - Ctrl+C/X/V (copy/cut/paste), Ctrl+D (duplicate), Delete
 - **Selection** - Ctrl+A (select all), Ctrl+Shift+I (select inverse), Tab/Shift+Tab (cycle selection), Shift+Lasso (add to selection), Alt+Lasso (remove from selection), 🎯 Select Menu (advanced filters)
+- **Alignment** - Ctrl+Shift+L/H/R/T/M/B (align left/center H/right/top/center V/bottom)
 - **Transform** - [ / ] (rotate), Ctrl+Shift+R (reset rotation)
 - **Canvas** - Ctrl+0 (reset zoom), Ctrl++/- (zoom), Space+Drag (pan)
 - **Snapping** - Ctrl+' (toggle grid), Hold Ctrl (disable snapping)

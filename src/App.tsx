@@ -5,6 +5,7 @@ import Canvas, { type CanvasRef } from './components/Canvas';
 import ToolPanel, { useToolState } from './components/ToolPanel';
 import ToolOptionsPanel from './components/ToolOptionsPanel';
 import SelectionFilterPanel from './components/SelectionFilterPanel';
+import AlignmentToolbar from './components/AlignmentToolbar';
 import PresenceIndicator from './components/PresenceIndicator';
 import UserList from './components/UserList';
 import AIChat from './components/AIChat';
@@ -35,11 +36,23 @@ function AppContent() {
   const { objects, deleteAllObjectsOptimistic } = useCanvas(user?.id, toastFunction);
   const canvasRef = useRef<CanvasRef>(null);
   const [hasSelection, setHasSelection] = useState(false);
+  const [selectionCount, setSelectionCount] = useState(0);
   const [clipboard, setClipboard] = useState<string[]>([]); // Store copied object IDs
   const { settings: snapSettings, toggleGrid } = useSnap();
   
   // Magic wand tolerance (0-100)
   const [magicWandTolerance, setMagicWandTolerance] = useState(15);
+
+  // Track selection count for alignment toolbar
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (canvasRef.current) {
+        const count = canvasRef.current.getSelectedObjects().length;
+        setSelectionCount(count);
+      }
+    }, 100); // Check every 100ms
+    return () => clearInterval(interval);
+  }, []);
 
   // Consolidated keyboard shortcuts handler
   useEffect(() => {
@@ -124,6 +137,37 @@ function AppContent() {
         e.preventDefault();
         await canvasRef.current?.selectInverse();
         return;
+      }
+
+      // Alignment shortcuts (Ctrl/Cmd+Shift+...)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey) {
+        const key = e.key.toLowerCase();
+        switch (key) {
+          case 'l': // Align Left
+            e.preventDefault();
+            await canvasRef.current?.align('left');
+            return;
+          case 'h': // Center Horizontally
+            e.preventDefault();
+            await canvasRef.current?.align('center-horizontal');
+            return;
+          case 'r': // Align Right
+            e.preventDefault();
+            await canvasRef.current?.align('right');
+            return;
+          case 't': // Align Top
+            e.preventDefault();
+            await canvasRef.current?.align('top');
+            return;
+          case 'm': // Center Vertically (Middle)
+            e.preventDefault();
+            await canvasRef.current?.align('center-vertical');
+            return;
+          case 'b': // Align Bottom
+            e.preventDefault();
+            await canvasRef.current?.align('bottom');
+            return;
+        }
       }
 
       // Copy: Ctrl/Cmd+C
@@ -439,6 +483,14 @@ function AppContent() {
                 activeTool={activeTool}
                 tolerance={magicWandTolerance}
                 onToleranceChange={setMagicWandTolerance}
+              />
+
+              {/* Alignment Toolbar (shows when 2+ objects selected) */}
+              <AlignmentToolbar
+                onAlign={(type) => canvasRef.current?.align(type)}
+                onDistribute={(type) => canvasRef.current?.distribute(type)}
+                onAlignToCanvas={(type) => canvasRef.current?.alignToCanvasCenter(type)}
+                selectionCount={selectionCount}
               />
             </div>
             
