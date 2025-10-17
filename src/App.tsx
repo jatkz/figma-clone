@@ -339,145 +339,145 @@ function AppContent() {
           {/* Header with logout */}
           <header className="bg-white shadow-sm border-b border-gray-200">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex justify-between items-center h-16 min-w-0">
-                <div className="flex items-center gap-6 min-w-0 flex-1">
-                  <h1 className="text-2xl font-bold text-gray-900 flex-shrink-0">
-                    CollabCanvas
-                  </h1>
-                  
-                  {/* Presence Indicator */}
-                  <div className="flex-shrink-0 min-w-fit">
-                    <PresenceIndicator />
-                  </div>
-
-                  {/* User List Toggle */}
-                  <button
-                    onClick={() => setShowUserList(!showUserList)}
-                    className={`px-3 py-1 text-sm rounded-lg font-medium transition-colors flex-shrink-0 ${
-                      showUserList 
-                        ? 'bg-blue-600 hover:bg-blue-700 text-white' 
-                        : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
-                    }`}
-                  >
-                    👥 Users
-                  </button>
-
-                  {/* AI Chat Toggle */}
-                  <button
-                    onClick={() => setShowAIChat(!showAIChat)}
-                    className={`px-3 py-1 text-sm rounded-lg font-medium transition-colors flex-shrink-0 ${
-                      showAIChat 
-                        ? 'bg-purple-600 hover:bg-purple-700 text-white' 
-                        : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
-                    }`}
-                  >
-                    🤖 AI Chat
-                  </button>
-
-                  {/* Select Menu */}
-                  <div className="relative flex-shrink-0">
-                    <button
-                      onClick={() => setShowSelectMenu(!showSelectMenu)}
-                      className="px-3 py-1 text-sm rounded-lg font-medium transition-colors bg-gray-200 hover:bg-gray-300 text-gray-700 border border-gray-300"
-                      title="Selection tools"
-                    >
-                      🎯 Select
-                    </button>
-                    
-                    {/* Dropdown Menu */}
-                    {showSelectMenu && (
-                      <>
-                        <div 
-                          className="fixed inset-0 z-10" 
-                          onClick={() => setShowSelectMenu(false)}
-                        />
-                        <div className="absolute top-full mt-1 right-0 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[200px] z-20">
-                          <button
-                            onClick={() => {
-                              canvasRef.current?.selectByType('rectangle');
-                              setShowSelectMenu(false);
-                            }}
-                            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors"
-                          >
-                            ◻️ Select All Rectangles
-                          </button>
-                          <button
-                            onClick={() => {
-                              canvasRef.current?.selectByType('circle');
-                              setShowSelectMenu(false);
-                            }}
-                            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors"
-                          >
-                            ⚪ Select All Circles
-                          </button>
-                          <button
-                            onClick={() => {
-                              canvasRef.current?.selectByType('text');
-                              setShowSelectMenu(false);
-                            }}
-                            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors"
-                          >
-                            🔤 Select All Text
-                          </button>
-                          <div className="border-t border-gray-200 my-1" />
-                          <button
-                            onClick={() => {
-                              canvasRef.current?.selectInverse();
-                              setShowSelectMenu(false);
-                            }}
-                            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors"
-                          >
-                            🔄 Select Inverse <span className="text-gray-400 text-xs ml-2">Ctrl+Shift+I</span>
-                          </button>
-                          <div className="border-t border-gray-200 my-1" />
-                          <button
-                            onClick={() => {
-                              setShowFilterPanel(true);
-                              setShowSelectMenu(false);
-                            }}
-                            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors"
-                          >
-                            🎛️ Advanced Filters
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Help Button */}
-                  <button
-                    onClick={() => setShowShortcuts(true)}
-                    className="px-3 py-1 text-sm rounded-lg font-medium transition-colors flex-shrink-0 bg-gray-200 hover:bg-gray-300 text-gray-700 border border-gray-300"
-                    title="Keyboard shortcuts (Press ?)"
-                  >
-                    ❓ Help
-                  </button>
-
-                  {/* Export Button */}
-                  <button
-                    onClick={() => setShowExport(true)}
-                    className="px-3 py-1 text-sm rounded-lg font-medium transition-colors flex-shrink-0 bg-green-100 hover:bg-green-200 text-green-700 border border-green-200"
-                    title="Export canvas (Ctrl+Shift+E)"
-                  >
-                    📥 Export
-                  </button>
-
-                  {/* Clear Canvas Button */}
-                  <button
-                    onClick={() => {
-                      if (window.confirm('Are you sure you want to delete all objects from the canvas? This cannot be undone.')) {
-                        deleteAllObjectsOptimistic();
-                      }
-                    }}
-                    className="px-3 py-1 text-sm rounded-lg font-medium transition-colors flex-shrink-0 bg-red-100 hover:bg-red-200 text-red-700 border border-red-200"
-                    title="Delete all objects from canvas"
-                  >
-                    🗑️ Clear All
-                  </button>
-                </div>
+              {/* Row 1: Title and User Info */}
+              <div className="flex justify-between items-center h-14 border-b border-gray-100">
+                <h1 className="text-2xl font-bold text-gray-900">
+                  CollabCanvas
+                </h1>
+                <LogoutButton />
+              </div>
+              
+              {/* Row 2: Action Buttons */}
+              <div className="flex items-center gap-4 h-12">
+                {/* Presence Indicator */}
                 <div className="flex-shrink-0">
-                  <LogoutButton />
+                  <PresenceIndicator />
                 </div>
+
+                {/* User List Toggle */}
+                <button
+                  onClick={() => setShowUserList(!showUserList)}
+                  className={`px-3 py-1 text-sm rounded-lg font-medium transition-colors flex-shrink-0 ${
+                    showUserList 
+                      ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                      : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                  }`}
+                >
+                  👥 Users
+                </button>
+
+                {/* AI Chat Toggle */}
+                <button
+                  onClick={() => setShowAIChat(!showAIChat)}
+                  className={`px-3 py-1 text-sm rounded-lg font-medium transition-colors flex-shrink-0 ${
+                    showAIChat 
+                      ? 'bg-purple-600 hover:bg-purple-700 text-white' 
+                      : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                  }`}
+                >
+                  🤖 AI Chat
+                </button>
+
+                {/* Select Menu */}
+                <div className="relative flex-shrink-0">
+                  <button
+                    onClick={() => setShowSelectMenu(!showSelectMenu)}
+                    className="px-3 py-1 text-sm rounded-lg font-medium transition-colors bg-gray-200 hover:bg-gray-300 text-gray-700 border border-gray-300"
+                    title="Selection tools"
+                  >
+                    🎯 Select
+                  </button>
+                  
+                  {/* Dropdown Menu */}
+                  {showSelectMenu && (
+                    <>
+                      <div 
+                        className="fixed inset-0 z-10" 
+                        onClick={() => setShowSelectMenu(false)}
+                      />
+                      <div className="absolute top-full mt-1 right-0 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[200px] z-20">
+                        <button
+                          onClick={() => {
+                            canvasRef.current?.selectByType('rectangle');
+                            setShowSelectMenu(false);
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors"
+                        >
+                          ◻️ Select All Rectangles
+                        </button>
+                        <button
+                          onClick={() => {
+                            canvasRef.current?.selectByType('circle');
+                            setShowSelectMenu(false);
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors"
+                        >
+                          ⚪ Select All Circles
+                        </button>
+                        <button
+                          onClick={() => {
+                            canvasRef.current?.selectByType('text');
+                            setShowSelectMenu(false);
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors"
+                        >
+                          🔤 Select All Text
+                        </button>
+                        <div className="border-t border-gray-200 my-1" />
+                        <button
+                          onClick={() => {
+                            canvasRef.current?.selectInverse();
+                            setShowSelectMenu(false);
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors"
+                        >
+                          🔄 Select Inverse <span className="text-gray-400 text-xs ml-2">Ctrl+Shift+I</span>
+                        </button>
+                        <div className="border-t border-gray-200 my-1" />
+                        <button
+                          onClick={() => {
+                            setShowFilterPanel(true);
+                            setShowSelectMenu(false);
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors"
+                        >
+                          🎛️ Advanced Filters
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Help Button */}
+                <button
+                  onClick={() => setShowShortcuts(true)}
+                  className="px-3 py-1 text-sm rounded-lg font-medium transition-colors flex-shrink-0 bg-gray-200 hover:bg-gray-300 text-gray-700 border border-gray-300"
+                  title="Keyboard shortcuts (Press ?)"
+                >
+                  ❓ Help
+                </button>
+
+                {/* Export Button */}
+                <button
+                  onClick={() => setShowExport(true)}
+                  className="px-3 py-1 text-sm rounded-lg font-medium transition-colors flex-shrink-0 bg-green-100 hover:bg-green-200 text-green-700 border border-green-200"
+                  title="Export canvas (Ctrl+Shift+E)"
+                >
+                  📥 Export
+                </button>
+
+                {/* Clear Canvas Button */}
+                <button
+                  onClick={() => {
+                    if (window.confirm('Are you sure you want to delete all objects from the canvas? This cannot be undone.')) {
+                      deleteAllObjectsOptimistic();
+                    }
+                  }}
+                  className="px-3 py-1 text-sm rounded-lg font-medium transition-colors flex-shrink-0 bg-red-100 hover:bg-red-200 text-red-700 border border-red-200"
+                  title="Delete all objects from canvas"
+                >
+                  🗑️ Clear All
+                </button>
               </div>
             </div>
           </header>
@@ -531,7 +531,7 @@ function AppContent() {
             className="fixed top-0 right-0 h-full w-80 bg-white shadow-xl border-l border-gray-200 z-50 transform transition-transform duration-300 ease-in-out"
             style={{ 
               transform: showUserList ? 'translateX(0)' : 'translateX(100%)',
-              paddingTop: '4rem' // Account for header height
+              paddingTop: '6.5rem' // Account for header height (2 rows)
             }}
           >
             <div className="h-full p-4 overflow-y-auto">
@@ -561,7 +561,7 @@ function AppContent() {
             className="fixed top-0 left-0 h-full w-96 bg-white shadow-xl border-r border-gray-200 z-50 transform transition-transform duration-300 ease-in-out"
             style={{ 
               transform: showAIChat ? 'translateX(0)' : 'translateX(-100%)',
-              paddingTop: '4rem' // Account for header height
+              paddingTop: '6.5rem' // Account for header height (2 rows)
             }}
           >
             <div className="h-full p-4 overflow-hidden flex flex-col">
