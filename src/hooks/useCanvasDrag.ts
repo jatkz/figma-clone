@@ -81,12 +81,15 @@ export function useCanvasDrag({
   // Throttled update functions for individual objects (single drag)
   const throttledSingleUpdateRef = useRef<Map<string, ((update: CanvasObjectUpdate) => void) & { cancel: () => void }>>(new Map());
   
+  // Get throttle delay from environment variable
+  const THROTTLE_MS = parseInt(import.meta.env.VITE_OBJECT_SYNC_THROTTLE) || 300;
+  
   // Create throttled batch update function
   if (!throttledBatchUpdateRef.current) {
     throttledBatchUpdateRef.current = throttle((updates: Map<string, CanvasObjectUpdate>) => {
-      // Send batch update to Firestore (throttled to 300ms)
+      // Send batch update to Firestore (throttled via VITE_OBJECT_SYNC_THROTTLE)
       batchUpdateObjectsOptimistic(updates);
-    }, 300);
+    }, THROTTLE_MS);
   }
   
   // Helper to get or create throttled update function for a single object
@@ -94,11 +97,11 @@ export function useCanvasDrag({
     if (!throttledSingleUpdateRef.current.has(objectId)) {
       const throttledFn = throttle((update: CanvasObjectUpdate) => {
         updateObjectOptimistic(objectId, update);
-      }, 300);
+      }, THROTTLE_MS);
       throttledSingleUpdateRef.current.set(objectId, throttledFn);
     }
     return throttledSingleUpdateRef.current.get(objectId)!;
-  }, [updateObjectOptimistic]);
+  }, [updateObjectOptimistic, THROTTLE_MS]);
   
   // Cleanup throttled functions on unmount
   useEffect(() => {
