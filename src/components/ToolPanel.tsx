@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 // Define available tools
-export type ToolType = 'select' | 'rectangle' | 'circle' | 'text';
+export type ToolType = 'select' | 'lasso' | 'rectangle' | 'circle' | 'text';
 
 interface ToolPanelProps {
   activeTool: ToolType;
@@ -22,6 +22,15 @@ const ToolPanel: React.FC<ToolPanelProps> = ({ activeTool, onToolChange, onDupli
         isActive={activeTool === 'select'}
         onClick={() => onToolChange('select')}
         shortcut="V"
+      />
+      
+      {/* Lasso Tool */}
+      <ToolButton
+        icon={<LassoIcon />}
+        label="Lasso"
+        isActive={activeTool === 'lasso'}
+        onClick={() => onToolChange('lasso')}
+        shortcut="L"
       />
       
       {/* Rectangle Tool */}
@@ -120,6 +129,13 @@ const SelectIcon: React.FC = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" />
     <path d="M13 13l6 6" />
+  </svg>
+);
+
+const LassoIcon: React.FC = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M12 2C8.5 2 5 3.5 3 6c-1.5 1.5-2 3.5-1.5 5.5.5 2 2 3.5 4 4 .5.2 1 .3 1.5.3 1.5 0 3-.7 4-2 1-1.3 1-3 1-4.5" strokeLinecap="round" />
+    <ellipse cx="16" cy="18" rx="5" ry="3.5" strokeLinecap="round" />
   </svg>
 );
 

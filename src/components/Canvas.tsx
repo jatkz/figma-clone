@@ -32,6 +32,7 @@ import { useSnap } from '../contexts/SnapContext';
 import type { SnapGuide } from '../types/snap';
 import SnapGuides from './SnapGuides';
 import Cursor from './Cursor';
+import { isObjectInLasso, shouldCloseLasso, simplifyPath } from '../utils/lassoUtils';
 
 // Throttle utility for cursor updates
 const throttle = <T extends (...args: any[]) => void>(func: T, delay: number): T => {
@@ -57,6 +58,12 @@ interface ViewportState {
   x: number;
   y: number;
   scale: number;
+}
+
+interface LassoState {
+  isDrawing: boolean;
+  points: number[]; // Flat array: [x1, y1, x2, y2, ...]
+  isClosing: boolean;
 }
 
 interface CanvasProps {
@@ -103,6 +110,13 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
   // Snap guides state
   const [snapGuides, setSnapGuides] = useState<SnapGuide[]>([]);
   const [isModifierPressed, setIsModifierPressed] = useState(false);
+
+  // Lasso selection state
+  const [lassoState, setLassoState] = useState<LassoState>({
+    isDrawing: false,
+    points: [],
+    isClosing: false
+  });
 
   // Real-time canvas state from Firestore
   const {
@@ -216,7 +230,16 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
       
       deselectObjects();
     }
-  }, [activeTool, selectedObjectIds, releaseMultipleLocks]);
+    
+    // Clear lasso state when switching away from lasso tool
+    if (activeTool !== 'lasso' && lassoState.isDrawing) {
+      setLassoState({
+        isDrawing: false,
+        points: [],
+        isClosing: false
+      });
+    }
+  }, [activeTool, selectedObjectIds, releaseMultipleLocks, lassoState.isDrawing]);
 
   // Other users' cursors from Firestore
   const [otherCursors, setOtherCursors] = useState<Map<string, CursorData>>(new Map());
@@ -490,6 +513,119 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     setEditingTextId(null);
   }, [user?.id, updateObjectOptimistic]);
 
+  // Handle lasso selection start
+  const handleLassoStart = useCallback((screenX: number, screenY: number) => {
+    if (activeTool !== 'lasso') return;
+    
+    // Convert screen coordinates to canvas coordinates
+    const { x, y } = screenToCanvasCoords(screenX, screenY);
+    
+    setLassoState({
+      isDrawing: true,
+      points: [x, y],
+      isClosing: false
+    });
+  }, [activeTool, screenToCanvasCoords]);
+
+  // Handle lasso path drawing (throttled)
+  const handleLassoMove = useCallback((screenX: number, screenY: number) => {
+    if (!lassoState.isDrawing) return;
+    
+    // Convert screen coordinates to canvas coordinates
+    const { x, y } = screenToCanvasCoords(screenX, screenY);
+    
+    // Check if we're close to the starting point (for visual feedback)
+    const isClosing = shouldCloseLasso(lassoState.points, { x, y }, 20 / viewport.scale);
+    
+    // Only add point if it's far enough from the last point (distance-based throttling)
+    const lastX = lassoState.points[lassoState.points.length - 2];
+    const lastY = lassoState.points[lassoState.points.length - 1];
+    const distance = Math.sqrt(Math.pow(x - lastX, 2) + Math.pow(y - lastY, 2));
+    
+    if (distance >= 5 / viewport.scale) { // Scale-aware distance threshold
+      setLassoState(prev => ({
+        ...prev,
+        points: [...prev.points, x, y],
+        isClosing
+      }));
+    } else if (isClosing !== lassoState.isClosing) {
+      // Update closing state even if not adding point
+      setLassoState(prev => ({
+        ...prev,
+        isClosing
+      }));
+    }
+  }, [lassoState.isDrawing, lassoState.points, lassoState.isClosing, screenToCanvasCoords, viewport.scale]);
+
+  // Handle lasso selection complete
+  const handleLassoComplete = useCallback(async (shiftKey: boolean = false, altKey: boolean = false) => {
+    if (!lassoState.isDrawing || lassoState.points.length < 6) {
+      // Need at least 3 points (6 coordinates) to form a valid selection area
+      setLassoState({
+        isDrawing: false,
+        points: [],
+        isClosing: false
+      });
+      return;
+    }
+    
+    // Simplify the path to improve performance
+    const simplifiedPoints = simplifyPath(lassoState.points, 3);
+    
+    // Find all objects whose center point is inside the lasso
+    const objectsInLasso = objects.filter(obj => isObjectInLasso(obj, simplifiedPoints));
+    
+    if (objectsInLasso.length === 0) {
+      toastFunction('No objects in lasso area', 'info', 1500);
+      setLassoState({
+        isDrawing: false,
+        points: [],
+        isClosing: false
+      });
+      return;
+    }
+    
+    const objectIdsInLasso = objectsInLasso.map(obj => obj.id);
+    
+    // Handle modifier keys for add/remove from selection
+    let newSelection: string[];
+    
+    if (shiftKey) {
+      // Shift: Add to current selection
+      newSelection = [...new Set([...selectedObjectIds, ...objectIdsInLasso])];
+    } else if (altKey) {
+      // Alt: Remove from current selection
+      newSelection = selectedObjectIds.filter(id => !objectIdsInLasso.includes(id));
+    } else {
+      // No modifier: Replace selection
+      // Release current locks first
+      await releaseMultipleLocks(selectedObjectIds);
+      newSelection = objectIdsInLasso;
+    }
+    
+    // Acquire locks on the new selection
+    const lockedIds = await acquireMultipleLocks(newSelection);
+    setSelectedObjectIds(lockedIds);
+    
+    // Show feedback
+    if (lockedIds.length > 0) {
+      const totalCount = newSelection.length;
+      if (lockedIds.length === totalCount) {
+        toastFunction(`${lockedIds.length} object${lockedIds.length > 1 ? 's' : ''} selected`, 'success', 1500);
+      } else {
+        const lockedCount = totalCount - lockedIds.length;
+        toastFunction(`Selected ${lockedIds.length} of ${totalCount} objects. ${lockedCount} locked by others`, 'warning', 2000);
+      }
+    }
+    
+    // Clear lasso
+    setLassoState({
+      isDrawing: false,
+      points: [],
+      isClosing: false
+    });
+  }, [lassoState.isDrawing, lassoState.points, objects, selectedObjectIds, acquireMultipleLocks, releaseMultipleLocks, toastFunction]);
+
   // Handle duplicate object(s) (Ctrl/Cmd+D) - Supports multi-select
   const handleDuplicateObject = useCallback(async () => {
     if (!user?.id || selectedObjectIds.length === 0) {
@@ -733,6 +869,18 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
         setIsModifierPressed(true);
       }
       
+      // Escape key: Cancel lasso drawing
+      if (e.key === 'Escape' && lassoState.isDrawing) {
+        e.preventDefault();
+        setLassoState({
+          isDrawing: false,
+          points: [],
+          isClosing: false
+        });
+        toastFunction('Lasso cancelled', 'info', 1000);
+        return;
+      }
+      
       if (e.code === 'Space' && !isSpacePressed) {
         // Don't activate if typing in input fields
         const target = e.target as HTMLElement;
@@ -772,7 +920,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [isSpacePressed, editingTextId]);
+  }, [isSpacePressed, editingTextId, lassoState.isDrawing, toastFunction]);
 
   // Handle rectangle drag events (supports group movement for multi-select)
   const handleRectangleDragStart = useCallback((objectId: string) => {
@@ -961,6 +1109,9 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
               setIsPanning(true);
               setLastPointerPosition(pos);
             }
+          } else if (activeTool === 'lasso') {
+            // Start lasso selection
+            handleLassoStart(pos.x, pos.y);
           } else if (activeTool === 'rectangle') {
             // Create rectangle at click position
             handleCreateRectangle(pos.x, pos.y);
@@ -972,7 +1123,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
             handleCreateText(pos.x, pos.y);
           }
         }
-      }, [activeTool, handleCreateRectangle, handleCreateCircle, handleCreateText, selectedObjectIds, releaseMultipleLocks, isSpacePressed]);
+      }, [activeTool, handleCreateRectangle, handleCreateCircle, handleCreateText, handleLassoStart, selectedObjectIds, releaseMultipleLocks, isSpacePressed]);
 
   // Handle mouse move for panning and cursor tracking
   const handleMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -982,8 +1133,13 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     const pos = stage.getPointerPosition();
     if (!pos) return;
 
-    // Handle panning if active (but not during text editing)
-    if (isPanning && !editingTextId) {
+    // Handle lasso drawing
+    if (lassoState.isDrawing) {
+      handleLassoMove(pos.x, pos.y);
+    }
+
+    // Handle panning if active (but not during text editing or lasso drawing)
+    if (isPanning && !editingTextId && !lassoState.isDrawing) {
       const dx = pos.x - lastPointerPosition.x;
       const dy = pos.y - lastPointerPosition.y;
 
@@ -1005,12 +1161,19 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     if (user?.id) {
       throttledCursorUpdate(canvasCoords.x, canvasCoords.y);
     }
-  }, [isPanning, lastPointerPosition, viewport, constrainViewport, stageToCanvasCoords, user?.id, throttledCursorUpdate, editingTextId]);
+  }, [isPanning, lastPointerPosition, viewport, constrainViewport, stageToCanvasCoords, user?.id, throttledCursorUpdate, editingTextId, lassoState.isDrawing, handleLassoMove]);
 
-  // Handle mouse up to stop panning
-  const handleMouseUp = useCallback(() => {
+  // Handle mouse up to stop panning and complete lasso
+  const handleMouseUp = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     setIsPanning(false);
-  }, []);
+    
+    // Complete lasso selection if active
+    if (lassoState.isDrawing) {
+      const shiftKey = e.evt.shiftKey;
+      const altKey = e.evt.altKey;
+      handleLassoComplete(shiftKey, altKey);
+    }
+  }, [lassoState.isDrawing, handleLassoComplete]);
 
   // Handle wheel for zooming
   const handleWheel = useCallback((e: Konva.KonvaEventObject<WheelEvent>) => {
@@ -1120,6 +1283,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
         style={{
           cursor: isPanning ? 'grabbing' : 
                   isSpacePressed ? 'grab' :
+                  activeTool === 'lasso' ? 'crosshair' :
                   (activeTool === 'rectangle' || activeTool === 'circle' || activeTool === 'text') ? 'crosshair' : 
                   'grab'
         }}
@@ -1296,6 +1460,40 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
           
           {/* Snap guides (smart alignment guides) */}
           <SnapGuides guides={snapGuides} scale={viewport.scale} />
+          
+          {/* Lasso path visualization */}
+          {lassoState.isDrawing && lassoState.points.length >= 2 && (
+            <React.Fragment>
+              <Line
+                points={lassoState.points}
+                stroke="#7B61FF"
+                strokeWidth={2 / viewport.scale}
+                dash={[10 / viewport.scale, 5 / viewport.scale]}
+                lineCap="round"
+                lineJoin="round"
+                opacity={0.8}
+                closed={false}
+                listening={false}
+              />
+              
+              {/* Closing indicator circle at start point */}
+              {lassoState.isClosing && (
+                <React.Fragment>
+                  <Rect
+                    x={lassoState.points[0] - 10 / viewport.scale}
+                    y={lassoState.points[1] - 10 / viewport.scale}
+                    width={20 / viewport.scale}
+                    height={20 / viewport.scale}
+                    stroke="#7B61FF"
+                    strokeWidth={2 / viewport.scale}
+                    fill="rgba(123, 97, 255, 0.2)"
+                    cornerRadius={10 / viewport.scale}
+                    listening={false}
+                  />
+                </React.Fragment>
+              )}
+            </React.Fragment>
+          )}
         </Layer>
       </Stage>
     </div>

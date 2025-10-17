@@ -58,12 +58,19 @@ function AppContent() {
         return;
       }
 
-      // Tool shortcuts (V, R, C, T)
+      // Tool shortcuts (V, L, R, C, T)
       switch (e.key.toLowerCase()) {
         case 'v':
           if (!e.ctrlKey && !e.metaKey) {
             e.preventDefault();
             setActiveTool('select');
+            return;
+          }
+          break;
+        case 'l':
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault();
+            setActiveTool('lasso');
             return;
           }
           break;

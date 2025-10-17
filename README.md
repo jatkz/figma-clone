@@ -16,6 +16,7 @@ A real-time collaborative canvas application built with React, TypeScript, and K
 - **Shape Tools** - Create rectangles, circles, and text objects
 - **Object Manipulation** - Move, resize, rotate, and delete objects
 - **Multi-Select** - Select and manipulate multiple objects at once
+- **Lasso Selection** - Draw freeform selection paths to select objects naturally
 - **Smart Guides** - Alignment guides with automatic snapping
 - **Snap-to-Grid** - Toggle-able grid snapping (10px grid)
 - **Zoom & Pan** - Navigate large canvases with mouse wheel zoom and space+drag panning
@@ -40,9 +41,9 @@ A real-time collaborative canvas application built with React, TypeScript, and K
 - **Context-Aware** - AI understands canvas state and selected objects
 
 ### Keyboard Shortcuts
-- **Tool Selection** - V (select), R (rectangle), C (circle), T (text)
+- **Tool Selection** - V (select), L (lasso), R (rectangle), C (circle), T (text)
 - **Object Operations** - Ctrl+C/X/V (copy/cut/paste), Ctrl+D (duplicate), Delete
-- **Selection** - Ctrl+A (select all), Tab/Shift+Tab (cycle selection)
+- **Selection** - Ctrl+A (select all), Tab/Shift+Tab (cycle selection), Shift+Lasso (add to selection), Alt+Lasso (remove from selection)
 - **Transform** - [ / ] (rotate), Ctrl+Shift+R (reset rotation)
 - **Canvas** - Ctrl+0 (reset zoom), Ctrl++/- (zoom), Space+Drag (pan)
 - **Snapping** - Ctrl+' (toggle grid), Hold Ctrl (disable snapping)
@@ -360,8 +361,8 @@ Ensure all environment variables are set in your hosting platform:
    - Click on canvas to create
 
 2. **Select & Edit**
-   - Press `V` for select tool
-   - Click objects to select
+   - Press `V` for select tool (click objects)
+   - Press `L` for lasso tool (draw around objects)
    - Drag to move, use handles to resize/rotate
 
 3. **Format Text**
