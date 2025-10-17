@@ -78,6 +78,9 @@ export function useCanvasDrag({
   // Throttled batch update function for group drag
   const throttledBatchUpdateRef = useRef<(((updates: Map<string, CanvasObjectUpdate>) => void) & { cancel: () => void }) | undefined>(undefined);
   
+  // Throttled update functions for individual objects (single drag)
+  const throttledSingleUpdateRef = useRef<Map<string, ((update: CanvasObjectUpdate) => void) & { cancel: () => void }>>(new Map());
+  
   // Create throttled batch update function
   if (!throttledBatchUpdateRef.current) {
     throttledBatchUpdateRef.current = throttle((updates: Map<string, CanvasObjectUpdate>) => {
@@ -86,10 +89,23 @@ export function useCanvasDrag({
     }, 300);
   }
   
-  // Cleanup throttled function on unmount
+  // Helper to get or create throttled update function for a single object
+  const getThrottledSingleUpdate = useCallback((objectId: string) => {
+    if (!throttledSingleUpdateRef.current.has(objectId)) {
+      const throttledFn = throttle((update: CanvasObjectUpdate) => {
+        updateObjectOptimistic(objectId, update);
+      }, 300);
+      throttledSingleUpdateRef.current.set(objectId, throttledFn);
+    }
+    return throttledSingleUpdateRef.current.get(objectId)!;
+  }, [updateObjectOptimistic]);
+  
+  // Cleanup throttled functions on unmount
   useEffect(() => {
     return () => {
       throttledBatchUpdateRef.current?.cancel();
+      throttledSingleUpdateRef.current.forEach(fn => fn.cancel());
+      throttledSingleUpdateRef.current.clear();
     };
   }, []);
 
@@ -211,15 +227,22 @@ export function useCanvasDrag({
         dimensions.height
       );
 
-      // Update local state only (no Firestore sync during drag)
-      // Final position will be sent at drag end
+      // Update local state immediately for smooth UI
       updateObjectLocal(objectId, {
         x: constrainedPosition.x,
         y: constrainedPosition.y,
         modifiedBy: user.id
       });
+      
+      // Send throttled Firestore update so other users see real-time movement
+      const throttledUpdate = getThrottledSingleUpdate(objectId);
+      throttledUpdate({
+        x: constrainedPosition.x,
+        y: constrainedPosition.y,
+        modifiedBy: user.id
+      });
     }
-  }, [user?.id, updateObjectLocal, objects, selectedObjectIds, snapSettings, isModifierPressed, setSnapGuides, throttledCursorUpdate]);
+  }, [user?.id, updateObjectLocal, getThrottledSingleUpdate, objects, selectedObjectIds, snapSettings, isModifierPressed, setSnapGuides, throttledCursorUpdate]);
 
   const handleRectangleDragEnd = useCallback(async (objectId: string, x: number, y: number) => {
     // Verify the user still has the lock 
@@ -255,7 +278,12 @@ export function useCanvasDrag({
         await batchUpdateObjectsOptimistic(batchUpdates);
       }
     } else {
-      // Single object drag - send final position update
+      // Single object drag - cancel pending throttled update and send final position
+      const throttledUpdate = throttledSingleUpdateRef.current.get(objectId);
+      if (throttledUpdate) {
+        throttledUpdate.cancel();
+      }
+      
       const dimensions = getShapeDimensions(object);
       const constrainedPosition = constrainToBounds(x, y, dimensions.width, dimensions.height);
 
