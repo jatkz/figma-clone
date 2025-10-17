@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import ProtectedRoute from './components/ProtectedRoute';
 import LogoutButton from './components/LogoutButton';
 import Canvas, { type CanvasRef } from './components/Canvas';
@@ -43,15 +43,31 @@ function AppContent() {
   // Magic wand tolerance (0-100)
   const [magicWandTolerance, setMagicWandTolerance] = useState(15);
 
-  // Track selection count for alignment toolbar
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (canvasRef.current) {
-        const count = canvasRef.current.getSelectedObjects().length;
-        setSelectionCount(count);
-      }
-    }, 100); // Check every 100ms
-    return () => clearInterval(interval);
+  // Handle selection changes (updates both hasSelection and selectionCount)
+  const handleSelectionChange = useCallback((hasSelection: boolean) => {
+    setHasSelection(hasSelection);
+    // Get actual selection count from canvas
+    if (canvasRef.current) {
+      const count = canvasRef.current.getSelectedObjects().length;
+      setSelectionCount(count);
+    }
+  }, []);
+
+  // Filter panel callbacks (memoized to prevent infinite loops)
+  const handleFilterClose = useCallback(() => {
+    setShowFilterPanel(false);
+    setFilterPreviewIds([]);
+  }, []);
+
+  const handleFilterPreview = useCallback((ids: string[]) => {
+    setFilterPreviewIds(ids);
+  }, []);
+
+  const handleFilterApply = useCallback(async (ids: string[]) => {
+    setFilterPreviewIds([]);
+    if (ids.length > 0) {
+      await canvasRef.current?.selectByIds?.(ids);
+    }
   }, []);
 
   // Consolidated keyboard shortcuts handler
@@ -500,7 +516,7 @@ function AppContent() {
           <Canvas
             ref={canvasRef}
             activeTool={activeTool}
-            onSelectionChange={setHasSelection}
+            onSelectionChange={handleSelectionChange}
             magicWandTolerance={magicWandTolerance}
             filterPreviewIds={filterPreviewIds}
           />
@@ -605,20 +621,11 @@ function AppContent() {
         {/* Selection Filter Panel */}
         <SelectionFilterPanel
           isOpen={showFilterPanel}
-          onClose={() => {
-            setShowFilterPanel(false);
-            setFilterPreviewIds([]);
-          }}
+          onClose={handleFilterClose}
           objects={objects}
           currentUserId={user?.id}
-          onPreview={(ids) => setFilterPreviewIds(ids)}
-          onApply={async (ids) => {
-            // Select the filtered objects via canvas
-            setFilterPreviewIds([]);
-            if (ids.length > 0) {
-              await canvasRef.current?.selectByIds?.(ids);
-            }
-          }}
+          onPreview={handleFilterPreview}
+          onApply={handleFilterApply}
         />
       </ProtectedRoute>
     </div>
