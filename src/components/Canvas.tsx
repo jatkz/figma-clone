@@ -24,7 +24,7 @@ import { getShapeDimensions } from '../utils/shapeUtils';
 import { useAuth } from '../hooks/useAuth';
 import { useCanvas } from '../hooks/useCanvas';
 import { useToastContext, createToastFunction } from '../contexts/ToastContext';
-import { updateCursor, subscribeToCursors, type CursorData } from '../services/canvasService';
+import { updateCursor, subscribeToCursors, type CursorData, type CanvasObjectUpdate } from '../services/canvasService';
 import { initializeAICanvasState, cleanupAICanvasState } from '../services/aiCanvasService';
 import { exportToSVG, exportToPNG, generatePreview, type ExportOptions } from '../utils/canvasExport';
 import { applySnapping } from '../utils/snapUtils';
@@ -136,6 +136,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     isConnected,
     createObjectOptimistic,
     updateObjectOptimistic,
+    updateObjectLocal,
     batchUpdateObjectsOptimistic,
     deleteObjectOptimistic,
     acquireObjectLock,
@@ -1255,8 +1256,6 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
         const selectedObj = objects.find(obj => obj.id === selectedId);
         const selectedInitialPos = groupDragStartPositions.current.get(selectedId);
         
-        console.log(`  Processing ${selectedId}: obj=${!!selectedObj}, initialPos=${!!selectedInitialPos}, lock=${selectedObj?.lockedBy}`);
-        
         if (selectedObj && selectedObj.lockedBy === user?.id && selectedInitialPos) {
           const newX = selectedInitialPos.x + deltaX;
           const newY = selectedInitialPos.y + deltaY;
@@ -1265,16 +1264,12 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
           const dimensions = getShapeDimensions(selectedObj);
           const constrainedPosition = constrainToBounds(newX, newY, dimensions.width, dimensions.height);
           
-          console.log(`    ✅ Updating ${selectedId} to (${constrainedPosition.x.toFixed(1)}, ${constrainedPosition.y.toFixed(1)})`);
-          
-          // Update position with optimistic updates
-          updateObjectOptimistic(selectedId, {
+          // Use LOCAL update only (no Firebase) for instant visual feedback during drag
+          // This prevents throttled updates from conflicting with the batch update at drag end
+          updateObjectLocal(selectedId, {
             x: constrainedPosition.x,
-            y: constrainedPosition.y,
-            modifiedBy: user.id
+            y: constrainedPosition.y
           });
-        } else {
-          console.log(`    ❌ Skipped ${selectedId}`);
         }
       });
       
@@ -1313,7 +1308,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
         modifiedBy: user.id
       });
     }
-  }, [user?.id, updateObjectOptimistic, objects, selectedObjectIds, snapSettings, isModifierPressed]);
+  }, [user?.id, updateObjectOptimistic, updateObjectLocal, objects, selectedObjectIds, snapSettings, isModifierPressed]);
 
   const handleRectangleDragEnd = useCallback(async (objectId: string, x: number, y: number) => {
     // Verify the user still has the lock 
@@ -1327,9 +1322,27 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     const wasGroupDrag = groupDragStartPositions.current.size > 1;
     
     if (wasGroupDrag) {
-      // For group drag, dragMove already updated all objects to their final positions
-      // Don't send another update here to avoid overwriting with potentially stale Konva coordinates
-      console.log(`🏁 Group drag ended for ${selectedObjectIds.length} objects`);
+      // For group drag, collect all final positions and batch update
+      console.log(`🏁 Group drag ended for ${selectedObjectIds.length} objects - sending batch update`);
+      
+      const batchUpdates = new Map<string, CanvasObjectUpdate>();
+      
+      // Collect all final positions from current object state
+      selectedObjectIds.forEach(selectedId => {
+        const selectedObj = objects.find(obj => obj.id === selectedId);
+        if (selectedObj && selectedObj.lockedBy === user?.id) {
+          batchUpdates.set(selectedId, {
+            x: selectedObj.x,
+            y: selectedObj.y,
+            modifiedBy: user.id
+          });
+        }
+      });
+      
+      // Send batch update to Firebase
+      if (batchUpdates.size > 0) {
+        await batchUpdateObjectsOptimistic(batchUpdates);
+      }
     } else {
       // Single object drag - send final position update
       const dimensions = getShapeDimensions(object);
@@ -1353,7 +1366,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
 
     // Keep lock active - user still has the object(s) selected for further editing
     console.log(`🔒 Lock maintained after drag completion`);
-  }, [objects, user?.id, updateObjectOptimistic, selectedObjectIds]);
+  }, [objects, user?.id, updateObjectOptimistic, batchUpdateObjectsOptimistic, selectedObjectIds]);
 
       // Handle mouse down for panning and tool interactions
       const handleMouseDown = useCallback(async (e: Konva.KonvaEventObject<MouseEvent>) => {

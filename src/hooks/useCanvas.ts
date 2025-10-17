@@ -25,6 +25,7 @@ interface UseCanvasState {
 interface UseCanvasActions {
   createObjectOptimistic: (objectData: CanvasObjectInput) => Promise<CanvasObject | null>;
   updateObjectOptimistic: (objectId: string, updates: CanvasObjectUpdate) => Promise<CanvasObject | null>;
+  updateObjectLocal: (objectId: string, updates: Partial<CanvasObject>) => void;
   batchUpdateObjectsOptimistic: (updates: Map<string, CanvasObjectUpdate>) => Promise<boolean>;
   deleteObjectOptimistic: (objectId: string) => Promise<boolean>;
   deleteAllObjectsOptimistic: () => Promise<boolean>;
@@ -285,6 +286,18 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
     }
   }, [objects, throttledObjectUpdate]);
 
+  // Local-only update (no Firebase call) - used for real-time visual feedback during group drag
+  const updateObjectLocal = useCallback((
+    objectId: string,
+    updates: Partial<CanvasObject>
+  ): void => {
+    setObjects(prev =>
+      prev.map(obj =>
+        obj.id === objectId ? { ...obj, ...updates } as CanvasObject : obj
+      )
+    );
+  }, []);
+
   // Batch optimistic update for multiple objects (used for alignment, distribution, multi-drag)
   const batchUpdateObjectsOptimistic = useCallback(async (
     updates: Map<string, CanvasObjectUpdate>
@@ -454,6 +467,7 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
     // Actions
     createObjectOptimistic,
     updateObjectOptimistic,
+    updateObjectLocal,
     batchUpdateObjectsOptimistic,
     deleteObjectOptimistic,
     deleteAllObjectsOptimistic,
