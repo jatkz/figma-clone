@@ -187,6 +187,29 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     onSelectionChange?.(selectedObjectIds.length > 0);
   }, [selectedObjectIds, onSelectionChange]);
 
+  // Track if we've already cleaned up stale locks
+  const hasCleanedLocksRef = useRef(false);
+
+  // Clean up stale locks on component mount (fixes visual "selection" bug after page refresh)
+  useEffect(() => {
+    if (!user?.id || !isConnected || objects.length === 0 || hasCleanedLocksRef.current) return;
+    
+    // Find any objects that are locked by current user
+    const staleLocks = objects.filter(obj => obj.lockedBy === user.id);
+    
+    if (staleLocks.length > 0) {
+      console.log(`🧹 Cleaning up ${staleLocks.length} stale lock(s) from previous session`);
+      
+      // Release all stale locks
+      staleLocks.forEach(obj => {
+        releaseObjectLock(obj.id);
+      });
+      
+      toastFunction(`Cleared ${staleLocks.length} stale lock(s)`, 'info', 2000);
+      hasCleanedLocksRef.current = true;
+    }
+  }, [user?.id, isConnected, objects, releaseObjectLock, toastFunction]);
+
   // Cursor position state for multiplayer cursor tracking
   const [, setCursorPosition] = useState<{ x: number; y: number } | null>(null);
 
