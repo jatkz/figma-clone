@@ -3,6 +3,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import LogoutButton from './components/LogoutButton';
 import Canvas, { type CanvasRef } from './components/Canvas';
 import ToolPanel, { useToolState } from './components/ToolPanel';
+import ToolOptionsPanel from './components/ToolOptionsPanel';
 import PresenceIndicator from './components/PresenceIndicator';
 import UserList from './components/UserList';
 import AIChat from './components/AIChat';
@@ -33,6 +34,9 @@ function AppContent() {
   const [hasSelection, setHasSelection] = useState(false);
   const [clipboard, setClipboard] = useState<string[]>([]); // Store copied object IDs
   const { settings: snapSettings, toggleGrid } = useSnap();
+  
+  // Magic wand tolerance (0-100)
+  const [magicWandTolerance, setMagicWandTolerance] = useState(15);
 
   // Consolidated keyboard shortcuts handler
   useEffect(() => {
@@ -59,7 +63,7 @@ function AppContent() {
         return;
       }
 
-      // Tool shortcuts (V, L, R, C, T)
+      // Tool shortcuts (V, L, W, R, C, T)
       switch (e.key.toLowerCase()) {
         case 'v':
           if (!e.ctrlKey && !e.metaKey) {
@@ -72,6 +76,13 @@ function AppContent() {
           if (!e.ctrlKey && !e.metaKey) {
             e.preventDefault();
             setActiveTool('lasso');
+            return;
+          }
+          break;
+        case 'w':
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault();
+            setActiveTool('magic-wand');
             return;
           }
           break;
@@ -401,13 +412,20 @@ function AppContent() {
         {/* Main content area - Canvas and Tool Panel */}
         <main className="flex-1 overflow-hidden">
           <div className="flex h-full">
-            {/* Tool Panel */}
-            <div className="p-4 flex-shrink-0">
+            {/* Tool Panel and Options */}
+            <div className="p-4 flex-shrink-0 space-y-4">
               <ToolPanel 
                 activeTool={activeTool}
                 onToolChange={setActiveTool}
                 onDuplicate={() => canvasRef.current?.duplicate()}
                 hasSelection={hasSelection}
+              />
+              
+              {/* Tool Options Panel (shows for magic wand) */}
+              <ToolOptionsPanel
+                activeTool={activeTool}
+                tolerance={magicWandTolerance}
+                onToleranceChange={setMagicWandTolerance}
               />
             </div>
             
@@ -418,6 +436,7 @@ function AppContent() {
                   ref={canvasRef}
                   activeTool={activeTool}
                   onSelectionChange={setHasSelection}
+                  magicWandTolerance={magicWandTolerance}
                 />
               </div>
             </div>

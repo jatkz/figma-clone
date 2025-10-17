@@ -33,6 +33,7 @@ import type { SnapGuide } from '../types/snap';
 import SnapGuides from './SnapGuides';
 import Cursor from './Cursor';
 import { isObjectInLasso, shouldCloseLasso, simplifyPath } from '../utils/lassoUtils';
+import { findObjectsByColor } from '../utils/colorUtils';
 
 // Throttle utility for cursor updates
 const throttle = <T extends (...args: any[]) => void>(func: T, delay: number): T => {
@@ -69,6 +70,7 @@ interface LassoState {
 interface CanvasProps {
   activeTool: ToolType;
   onSelectionChange?: (hasSelection: boolean) => void;
+  magicWandTolerance?: number;
 }
 
 export interface CanvasRef {
@@ -93,7 +95,7 @@ export interface CanvasRef {
   generatePreview: (mode: 'viewport' | 'entire' | 'selected') => string | null;
 }
 
-const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChange }, ref) => {
+const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChange, magicWandTolerance = 15 }, ref) => {
   const stageRef = useRef<Konva.Stage>(null);
   const { user } = useAuth();
   
@@ -331,8 +333,59 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     };
   }, []);
 
+  // Handle magic wand click (select all objects with matching color)
+  const handleMagicWandClick = useCallback(async (objectId: string, shiftKey: boolean = false) => {
+    if (activeTool !== 'magic-wand') return;
+    
+    // Find the clicked object
+    const clickedObject = objects.find(obj => obj.id === objectId);
+    if (!clickedObject) return;
+    
+    // Find all objects with matching color (within tolerance)
+    const matchingObjects = findObjectsByColor(objects, clickedObject.color, magicWandTolerance);
+    
+    if (matchingObjects.length === 0) {
+      toastFunction('No objects with matching color found', 'info', 1500);
+      return;
+    }
+    
+    const matchingIds = matchingObjects.map(obj => obj.id);
+    
+    let newSelection: string[];
+    
+    if (shiftKey) {
+      // Shift: Add to current selection
+      newSelection = [...new Set([...selectedObjectIds, ...matchingIds])];
+    } else {
+      // No modifier: Replace selection
+      await releaseMultipleLocks(selectedObjectIds);
+      newSelection = matchingIds;
+    }
+    
+    // Try to acquire locks on the new selection
+    const lockedIds = await acquireMultipleLocks(newSelection);
+    setSelectedObjectIds(lockedIds);
+    
+    // Show feedback
+    if (lockedIds.length > 0) {
+      const totalCount = newSelection.length;
+      if (lockedIds.length === totalCount) {
+        toastFunction(`Selected ${lockedIds.length} object${lockedIds.length > 1 ? 's' : ''} with matching color`, 'success', 1500);
+      } else {
+        const lockedCount = totalCount - lockedIds.length;
+        toastFunction(`Selected ${lockedIds.length} of ${totalCount} objects. ${lockedCount} locked by others`, 'warning', 2000);
+      }
+    }
+  }, [activeTool, objects, magicWandTolerance, selectedObjectIds, acquireMultipleLocks, releaseMultipleLocks, toastFunction]);
+
   // Handle rectangle click with locking and enhanced messaging (now supports Shift+Click multi-select)
   const handleRectangleClick = useCallback(async (objectId: string, shiftKey: boolean = false) => {
+    // Magic wand takes precedence
+    if (activeTool === 'magic-wand') {
+      await handleMagicWandClick(objectId, shiftKey);
+      return;
+    }
+    
     if (activeTool === 'select') {
       // Shift+Click: Add/remove from selection
       if (shiftKey) {
@@ -1364,6 +1417,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
           cursor: isPanning ? 'grabbing' : 
                   isSpacePressed ? 'grab' :
                   activeTool === 'lasso' ? 'crosshair' :
+                  activeTool === 'magic-wand' ? 'pointer' :
                   (activeTool === 'rectangle' || activeTool === 'circle' || activeTool === 'text') ? 'crosshair' : 
                   'grab'
         }}

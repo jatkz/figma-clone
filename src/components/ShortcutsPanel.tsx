@@ -10,6 +10,7 @@ const shortcuts: Shortcut[] = [
   // Tools
   { keys: ['V'], description: 'Select tool', category: 'Tools' },
   { keys: ['L'], description: 'Lasso selection tool', category: 'Tools' },
+  { keys: ['W'], description: 'Magic Wand (select by color)', category: 'Tools' },
   { keys: ['R'], description: 'Rectangle tool', category: 'Tools' },
   { keys: ['C'], description: 'Circle tool', category: 'Tools' },
   { keys: ['T'], description: 'Text tool', category: 'Tools' },
@@ -21,6 +22,7 @@ const shortcuts: Shortcut[] = [
   { keys: ['Tab'], description: 'Select next object', category: 'Selection' },
   { keys: ['Shift', 'Tab'], description: 'Select previous object', category: 'Selection' },
   { keys: ['Shift', 'Lasso'], description: 'Add to selection with lasso', category: 'Selection' },
+  { keys: ['Shift', 'Wand'], description: 'Add to selection with magic wand', category: 'Selection' },
   { keys: ['Alt', 'Lasso'], description: 'Remove from selection with lasso', category: 'Selection' },
   { keys: ['Esc'], description: 'Deselect all', category: 'Selection' },
   

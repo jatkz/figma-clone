@@ -17,6 +17,7 @@ A real-time collaborative canvas application built with React, TypeScript, and K
 - **Object Manipulation** - Move, resize, rotate, and delete objects
 - **Multi-Select** - Select and manipulate multiple objects at once
 - **Lasso Selection** - Draw freeform selection paths to select objects naturally
+- **Magic Wand** - Select all objects with matching colors (with adjustable tolerance)
 - **Advanced Selection Tools** - Select by type (all rectangles/circles/text), select inverse
 - **Smart Guides** - Alignment guides with automatic snapping
 - **Snap-to-Grid** - Toggle-able grid snapping (10px grid)
@@ -42,7 +43,7 @@ A real-time collaborative canvas application built with React, TypeScript, and K
 - **Context-Aware** - AI understands canvas state and selected objects
 
 ### Keyboard Shortcuts
-- **Tool Selection** - V (select), L (lasso), R (rectangle), C (circle), T (text)
+- **Tool Selection** - V (select), L (lasso), W (magic wand), R (rectangle), C (circle), T (text)
 - **Object Operations** - Ctrl+C/X/V (copy/cut/paste), Ctrl+D (duplicate), Delete
 - **Selection** - Ctrl+A (select all), Ctrl+Shift+I (select inverse), Tab/Shift+Tab (cycle selection), Shift+Lasso (add to selection), Alt+Lasso (remove from selection)
 - **Transform** - [ / ] (rotate), Ctrl+Shift+R (reset rotation)

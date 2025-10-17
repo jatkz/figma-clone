@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 // Define available tools
-export type ToolType = 'select' | 'lasso' | 'rectangle' | 'circle' | 'text';
+export type ToolType = 'select' | 'lasso' | 'magic-wand' | 'rectangle' | 'circle' | 'text';
 
 interface ToolPanelProps {
   activeTool: ToolType;
@@ -31,6 +31,15 @@ const ToolPanel: React.FC<ToolPanelProps> = ({ activeTool, onToolChange, onDupli
         isActive={activeTool === 'lasso'}
         onClick={() => onToolChange('lasso')}
         shortcut="L"
+      />
+      
+      {/* Magic Wand Tool */}
+      <ToolButton
+        icon={<MagicWandIcon />}
+        label="Magic Wand"
+        isActive={activeTool === 'magic-wand'}
+        onClick={() => onToolChange('magic-wand')}
+        shortcut="W"
       />
       
       {/* Rectangle Tool */}
@@ -136,6 +145,19 @@ const LassoIcon: React.FC = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M12 2C8.5 2 5 3.5 3 6c-1.5 1.5-2 3.5-1.5 5.5.5 2 2 3.5 4 4 .5.2 1 .3 1.5.3 1.5 0 3-.7 4-2 1-1.3 1-3 1-4.5" strokeLinecap="round" />
     <ellipse cx="16" cy="18" rx="5" ry="3.5" strokeLinecap="round" />
+  </svg>
+);
+
+const MagicWandIcon: React.FC = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M15 4l-4 4" strokeLinecap="round" />
+    <path d="M3 20l8-8" strokeLinecap="round" />
+    <line x1="18" y1="2" x2="18" y2="6" strokeLinecap="round" />
+    <line x1="16" y1="4" x2="20" y2="4" strokeLinecap="round" />
+    <line x1="6" y1="18" x2="6" y2="22" strokeLinecap="round" />
+    <line x1="4" y1="20" x2="8" y2="20" strokeLinecap="round" />
+    <line x1="21" y1="9" x2="21" y2="11" strokeLinecap="round" />
+    <line x1="20" y1="10" x2="22" y2="10" strokeLinecap="round" />
   </svg>
 );
 
