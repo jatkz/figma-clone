@@ -24,6 +24,7 @@ function AppContent() {
   const [showAIChat, setShowAIChat] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showExport, setShowExport] = useState(false);
+  const [showSelectMenu, setShowSelectMenu] = useState(false);
   const { toasts, removeToast } = useToastContext();
   const { user } = useAuth();
   const toastFunction = createToastFunction(useToastContext());
@@ -101,6 +102,13 @@ function AppContent() {
       if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
         e.preventDefault();
         await canvasRef.current?.selectAll();
+        return;
+      }
+
+      // Select Inverse: Ctrl/Cmd+Shift+I
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'i' || e.key === 'I')) {
+        e.preventDefault();
+        await canvasRef.current?.selectInverse();
         return;
       }
 
@@ -291,6 +299,66 @@ function AppContent() {
                   >
                     🤖 AI Chat
                   </button>
+
+                  {/* Select Menu */}
+                  <div className="relative flex-shrink-0">
+                    <button
+                      onClick={() => setShowSelectMenu(!showSelectMenu)}
+                      className="px-3 py-1 text-sm rounded-lg font-medium transition-colors bg-gray-200 hover:bg-gray-300 text-gray-700 border border-gray-300"
+                      title="Selection tools"
+                    >
+                      🎯 Select
+                    </button>
+                    
+                    {/* Dropdown Menu */}
+                    {showSelectMenu && (
+                      <>
+                        <div 
+                          className="fixed inset-0 z-10" 
+                          onClick={() => setShowSelectMenu(false)}
+                        />
+                        <div className="absolute top-full mt-1 right-0 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[200px] z-20">
+                          <button
+                            onClick={() => {
+                              canvasRef.current?.selectByType('rectangle');
+                              setShowSelectMenu(false);
+                            }}
+                            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors"
+                          >
+                            ◻️ Select All Rectangles
+                          </button>
+                          <button
+                            onClick={() => {
+                              canvasRef.current?.selectByType('circle');
+                              setShowSelectMenu(false);
+                            }}
+                            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors"
+                          >
+                            ⚪ Select All Circles
+                          </button>
+                          <button
+                            onClick={() => {
+                              canvasRef.current?.selectByType('text');
+                              setShowSelectMenu(false);
+                            }}
+                            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors"
+                          >
+                            🔤 Select All Text
+                          </button>
+                          <div className="border-t border-gray-200 my-1" />
+                          <button
+                            onClick={() => {
+                              canvasRef.current?.selectInverse();
+                              setShowSelectMenu(false);
+                            }}
+                            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors"
+                          >
+                            🔄 Select Inverse <span className="text-gray-400 text-xs ml-2">Ctrl+Shift+I</span>
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
 
                   {/* Help Button */}
                   <button

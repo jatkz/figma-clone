@@ -17,6 +17,7 @@ const shortcuts: Shortcut[] = [
   
   // Selection
   { keys: ['Ctrl', 'A'], description: 'Select all objects', category: 'Selection' },
+  { keys: ['Ctrl', 'Shift', 'I'], description: 'Select inverse (everything except current)', category: 'Selection' },
   { keys: ['Tab'], description: 'Select next object', category: 'Selection' },
   { keys: ['Shift', 'Tab'], description: 'Select previous object', category: 'Selection' },
   { keys: ['Shift', 'Lasso'], description: 'Add to selection with lasso', category: 'Selection' },

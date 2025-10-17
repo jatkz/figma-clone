@@ -78,6 +78,8 @@ export interface CanvasRef {
   selectAll: () => Promise<void>;
   selectNext: () => Promise<void>;
   selectPrevious: () => Promise<void>;
+  selectInverse: () => Promise<void>;
+  selectByType: (objectType: 'rectangle' | 'circle' | 'text', addToSelection?: boolean) => Promise<void>;
   rotateBy: (degrees: number) => void;
   resetRotation: () => void;
   isTextEditing: () => boolean;
@@ -782,6 +784,82 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     setSelectedObjectIds(locked);
   }, [user?.id, objects, selectedObjectIds, acquireMultipleLocks, releaseMultipleLocks]);
 
+  // Handle select inverse (select all except currently selected)
+  const handleSelectInverse = useCallback(async () => {
+    if (!user?.id) return;
+    
+    // Get all object IDs
+    const allIds = objects.map(obj => obj.id);
+    
+    // Find objects not currently selected
+    const unselectedIds = allIds.filter(id => !selectedObjectIds.includes(id));
+    
+    if (unselectedIds.length === 0) {
+      toastFunction('No objects to select', 'info', 1500);
+      return;
+    }
+    
+    // Release current locks
+    await releaseMultipleLocks(selectedObjectIds);
+    
+    // Try to acquire locks on previously unselected objects
+    const lockedIds = await acquireMultipleLocks(unselectedIds);
+    setSelectedObjectIds(lockedIds);
+    
+    // Show feedback
+    if (lockedIds.length > 0) {
+      const totalCount = unselectedIds.length;
+      if (lockedIds.length === totalCount) {
+        toastFunction(`Selected ${lockedIds.length} object${lockedIds.length > 1 ? 's' : ''}`, 'success', 1500);
+      } else {
+        const lockedCount = totalCount - lockedIds.length;
+        toastFunction(`Selected ${lockedIds.length} of ${totalCount} objects. ${lockedCount} locked by others`, 'warning', 2000);
+      }
+    }
+  }, [user?.id, objects, selectedObjectIds, releaseMultipleLocks, acquireMultipleLocks, toastFunction]);
+
+  // Handle select by type (all rectangles, circles, or text)
+  const handleSelectByType = useCallback(async (objectType: 'rectangle' | 'circle' | 'text', addToSelection: boolean = false) => {
+    if (!user?.id) return;
+    
+    // Find all objects of the specified type
+    const matchingObjects = objects.filter(obj => obj.type === objectType);
+    
+    if (matchingObjects.length === 0) {
+      toastFunction(`No ${objectType}s found`, 'info', 1500);
+      return;
+    }
+    
+    const matchingIds = matchingObjects.map(obj => obj.id);
+    
+    let newSelection: string[];
+    
+    if (addToSelection) {
+      // Add to current selection (merge with existing)
+      newSelection = [...new Set([...selectedObjectIds, ...matchingIds])];
+    } else {
+      // Replace selection
+      await releaseMultipleLocks(selectedObjectIds);
+      newSelection = matchingIds;
+    }
+    
+    // Try to acquire locks
+    const lockedIds = await acquireMultipleLocks(newSelection);
+    setSelectedObjectIds(lockedIds);
+    
+    // Show feedback
+    const typeName = objectType === 'circle' ? 'circle' : objectType;
+    if (lockedIds.length > 0) {
+      const totalCount = newSelection.length;
+      if (lockedIds.length === totalCount) {
+        toastFunction(`Selected ${lockedIds.length} ${typeName}${lockedIds.length > 1 ? 's' : ''}`, 'success', 1500);
+      } else {
+        const lockedCount = totalCount - lockedIds.length;
+        toastFunction(`Selected ${lockedIds.length} of ${totalCount} ${typeName}s. ${lockedCount} locked by others`, 'warning', 2000);
+      }
+    }
+  }, [user?.id, objects, selectedObjectIds, releaseMultipleLocks, acquireMultipleLocks, toastFunction]);
+
   // Expose functions to parent via ref
   useImperativeHandle(ref, () => ({
     duplicate: handleDuplicateObject,
@@ -790,6 +868,8 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     selectAll: handleSelectAll,
     selectNext: handleSelectNext,
     selectPrevious: handleSelectPrevious,
+    selectInverse: handleSelectInverse,
+    selectByType: handleSelectByType,
     rotateBy: (degrees: number) => {
       if (selectedObjectIds.length === 1) {
         rotateBy(degrees);
@@ -859,7 +939,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
       
       return generatePreview(params, mode);
     }
-  }), [handleDuplicateObject, handleDeleteSelected, handleClearSelection, handleSelectAll, handleSelectNext, handleSelectPrevious, rotateBy, resetRotation, selectedObjectIds, editingTextId, toastFunction, viewport, objects, stageRef]);
+  }), [handleDuplicateObject, handleDeleteSelected, handleClearSelection, handleSelectAll, handleSelectNext, handleSelectPrevious, handleSelectInverse, handleSelectByType, rotateBy, resetRotation, selectedObjectIds, editingTextId, toastFunction, viewport, objects, stageRef]);
 
   // Track Space key for pan mode (Space+Drag to pan) and Cmd/Ctrl for snap override
   useEffect(() => {
