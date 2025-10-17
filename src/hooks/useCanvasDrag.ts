@@ -48,7 +48,6 @@ export function useCanvasDrag({
     // Verify the user has the lock before allowing drag
     const object = objects.find(obj => obj.id === objectId);
     if (!object || object.lockedBy !== user?.id) {
-      console.warn(`Drag start blocked: User ${user?.id} doesn't own lock on ${objectId}`);
       return false; // Prevent drag
     }
     
@@ -64,11 +63,9 @@ export function useCanvasDrag({
         }
       });
       groupDragStartPositions.current = initialPositions;
-      console.log(`🎯 Group drag started for ${selectedObjectIds.length} objects`);
     } else {
       // Single object drag - clear any stored positions
       groupDragStartPositions.current.clear();
-      console.log(`🎯 Drag started for object ${objectId} by user ${user.id}`);
     }
     
     return true; // Allow drag
@@ -78,7 +75,6 @@ export function useCanvasDrag({
     // Only allow drag moves if user has acquired the lock (safety check)
     const object = objects.find(obj => obj.id === objectId);
     if (!object || object.lockedBy !== user?.id) {
-      console.warn(`Drag blocked: User ${user?.id} doesn't own lock on ${objectId}`);
       return;
     }
 
@@ -93,14 +89,11 @@ export function useCanvasDrag({
       // Group movement: Calculate delta from INITIAL position (stored at drag start)
       const initialPos = groupDragStartPositions.current.get(objectId);
       if (!initialPos) {
-        console.warn('⚠️ No initial position stored for group drag');
         return;
       }
       
       const deltaX = x - initialPos.x;
       const deltaY = y - initialPos.y;
-      
-      console.log(`🔄 Group drag for ${selectedObjectIds.length} objects:`, selectedObjectIds);
       
       // Move all selected objects by the same delta (from THEIR initial positions)
       selectedObjectIds.forEach(selectedId => {
@@ -166,7 +159,6 @@ export function useCanvasDrag({
     // Verify the user still has the lock 
     const object = objects.find(obj => obj.id === objectId);
     if (!object || object.lockedBy !== user?.id) {
-      console.warn(`Drag end blocked: User ${user?.id} doesn't own lock on ${objectId}`);
       return;
     }
 
@@ -175,8 +167,6 @@ export function useCanvasDrag({
     
     if (wasGroupDrag) {
       // For group drag, collect all final positions and batch update
-      console.log(`🏁 Group drag ended for ${selectedObjectIds.length} objects - sending batch update`);
-      
       const batchUpdates = new Map<string, CanvasObjectUpdate>();
       
       // Collect all final positions from current object state
@@ -199,8 +189,6 @@ export function useCanvasDrag({
       // Single object drag - send final position update
       const dimensions = getShapeDimensions(object);
       const constrainedPosition = constrainToBounds(x, y, dimensions.width, dimensions.height);
-      
-      console.log(`🏁 Drag ended for object ${objectId} at position (${constrainedPosition.x}, ${constrainedPosition.y})`);
 
       // Send final position update to Firestore (this will override any pending throttled updates)
       await updateObjectOptimistic(objectId, {
@@ -217,7 +205,6 @@ export function useCanvasDrag({
     setSnapGuides([]);
 
     // Keep lock active - user still has the object(s) selected for further editing
-    console.log(`🔒 Lock maintained after drag completion`);
   }, [objects, user?.id, updateObjectOptimistic, batchUpdateObjectsOptimistic, selectedObjectIds, setSnapGuides]);
 
   return {

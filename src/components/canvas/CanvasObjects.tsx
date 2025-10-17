@@ -107,5 +107,5 @@ const CanvasObjects: React.FC<CanvasObjectsProps> = ({
   );
 };
 
-export default CanvasObjects;
+export default React.memo(CanvasObjects);
 

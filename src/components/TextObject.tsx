@@ -64,10 +64,7 @@ const TextObjectComponent: React.FC<TextObjectProps> = ({
     if (isSelected) {
       onDeselect();
     } else {
-      const canSelect = onSelect(textObject.id, shiftKey);
-      if (!canSelect) {
-        console.warn('Could not select text - lock acquisition failed');
-      }
+      onSelect(textObject.id, shiftKey);
     }
   };
 
@@ -256,4 +253,4 @@ const TextObjectComponent: React.FC<TextObjectProps> = ({
   );
 };
 
-export default TextObjectComponent;
+export default React.memo(TextObjectComponent);

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Rect, Text } from 'react-konva';
 import type { RectangleObject } from '../types/canvas';
 import { constrainToBounds } from '../utils/constrainToBounds';
@@ -54,7 +54,6 @@ const Rectangle: React.FC<RectangleProps> = ({
     if (constrainedPosition.x !== x || constrainedPosition.y !== y) {
       e.target.x(constrainedPosition.x);
       e.target.y(constrainedPosition.y);
-      console.log('🔄 Visual position corrected:', { original: { x, y }, constrained: constrainedPosition });
     }
     
     // Always call with the constrained position
@@ -72,12 +71,12 @@ const Rectangle: React.FC<RectangleProps> = ({
   const lockingUser = object.lockedBy ? 
     (users instanceof Map ? users.get(object.lockedBy) : users?.[object.lockedBy]) : null;
   
-  // Get lock border color
-  const getLockBorderColor = () => {
+  // Memoize lock border color to avoid recalculation on every render
+  const lockBorderColor = useMemo(() => {
     if (isLockedByCurrentUser) return '#007AFF'; // Blue for current user
     if (isLockedByOther && lockingUser) return lockingUser.cursorColor || '#FF3B30'; // User's cursor color or red fallback
     return '#FF3B30'; // Default red for unknown users
-  };
+  }, [isLockedByCurrentUser, isLockedByOther, lockingUser]);
 
   return (
     <>
@@ -153,7 +152,7 @@ const Rectangle: React.FC<RectangleProps> = ({
           width={object.width + 6}
           height={object.height + 6}
           fill="transparent"
-          stroke={getLockBorderColor()}
+          stroke={lockBorderColor}
           strokeWidth={3}
           rotation={object.rotation}
           dash={isLockedByCurrentUser ? [8, 4] : [4, 4]} // Different dash pattern for own vs others
@@ -170,7 +169,7 @@ const Rectangle: React.FC<RectangleProps> = ({
             y={object.y - 25}
             width={lockingUser.displayName.length * 8 + 12} // Approximate text width
             height={20}
-            fill={getLockBorderColor()}
+            fill={lockBorderColor}
             cornerRadius={4}
             listening={false}
           />
@@ -192,4 +191,4 @@ const Rectangle: React.FC<RectangleProps> = ({
   );
 };
 
-export default Rectangle;
+export default React.memo(Rectangle);

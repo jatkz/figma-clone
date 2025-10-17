@@ -119,8 +119,6 @@ export const subscribeToObjects = (
   try {
     const objectsCollectionRef = collection(db, OBJECTS_COLLECTION_PATH);
     
-    console.log('Setting up real-time listener for canvas objects...');
-    
     const unsubscribe = onSnapshot(
       objectsCollectionRef,
       (snapshot) => {
@@ -139,11 +137,9 @@ export const subscribeToObjects = (
           objects.push(object);
         });
         
-        console.log(`Received ${objects.length} objects from Firestore`);
         callback(objects);
       },
-      (error) => {
-        console.error('Error in objects subscription:', error);
+      (_error) => {
         // Call callback with empty array on error to handle gracefully
         callback([]);
       }
@@ -164,8 +160,6 @@ export const subscribeToObjects = (
  */
 export const createObject = async (objectData: CanvasObjectInput): Promise<CanvasObject> => {
   try {
-    console.log('Creating object in Firestore:', objectData);
-    
     const objectsCollectionRef = collection(db, OBJECTS_COLLECTION_PATH);
     
     // Prepare data for Firestore - REMOVE the temporary ID!
@@ -178,8 +172,6 @@ export const createObject = async (objectData: CanvasObjectInput): Promise<Canva
     
     // Add document to Firestore (Firestore will generate the ID)
     const docRef = await addDoc(objectsCollectionRef, firestoreData);
-    
-    console.log('Object created with ID:', docRef.id);
     
     // Return the object with the generated ID
     const createdObject = {
@@ -205,8 +197,6 @@ export const updateObject = async (
   updates: CanvasObjectUpdate
 ): Promise<CanvasObject> => {
   try {
-    console.log('Updating object in Firestore:', objectId, updates);
-    
     const objectDocRef = doc(db, OBJECTS_COLLECTION_PATH, objectId);
     
     // Use a transaction to ensure atomic updates with version increment
@@ -238,11 +228,8 @@ export const updateObject = async (
       };
     });
     
-    console.log('Object updated successfully:', objectId);
     return updatedObject;
   } catch (error) {
-    console.error('Error updating object:', error);
-    
     if (error instanceof Error && error.message.includes('not found')) {
       throw error; // Re-throw not found errors as-is
     }
@@ -260,8 +247,6 @@ export const batchUpdateObjects = async (
   updates: Map<string, CanvasObjectUpdate>
 ): Promise<CanvasObject[]> => {
   try {
-    console.log('Batch updating objects in Firestore:', Array.from(updates.keys()));
-    
     const updatedObjects = await runTransaction(db, async (transaction) => {
       const results: CanvasObject[] = [];
       
@@ -303,10 +288,8 @@ export const batchUpdateObjects = async (
       return results;
     });
     
-    console.log('Batch update completed successfully for', updatedObjects.length, 'objects');
     return updatedObjects;
   } catch (error) {
-    console.error('Error in batch update:', error);
     throw new Error('Failed to batch update objects');
   }
 };
@@ -318,22 +301,18 @@ export const batchUpdateObjects = async (
  */
 export const deleteObject = async (objectId: string): Promise<void> => {
   try {
-    console.log('Deleting object from Firestore:', objectId);
     
     const objectDocRef = doc(db, OBJECTS_COLLECTION_PATH, objectId);
     
     // Check if object exists before deletion
     const objectDoc = await getDoc(objectDocRef);
     if (!objectDoc.exists()) {
-      console.warn(`Object with ID ${objectId} not found, skipping deletion`);
       return; // Silently succeed if object doesn't exist
     }
     
     await deleteDoc(objectDocRef);
     
-    console.log('Object deleted successfully:', objectId);
   } catch (error) {
-    console.error('Error deleting object:', error);
     throw new Error('Failed to delete object');
   }
 };
@@ -584,7 +563,6 @@ export const updateCursor = async (
 
     await setDoc(cursorDocRef, cursorData);
   } catch (error) {
-    console.error('Error updating cursor:', error);
     // Don't throw error for cursor updates - they're not critical
   }
 };
@@ -598,7 +576,6 @@ export const subscribeToCursors = (
   callback: (cursors: Map<string, CursorData>) => void
 ): Unsubscribe => {
   const cursorsCollectionRef = collection(db, CURSORS_COLLECTION_PATH);
-  console.log(`Subscribing to cursors at: ${CURSORS_COLLECTION_PATH}`);
 
   const unsubscribe = onSnapshot(
     cursorsCollectionRef,

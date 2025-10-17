@@ -74,4 +74,13 @@ const Cursor: React.FC<CursorProps> = ({ cursorData }) => {
   );
 };
 
-export default Cursor;
+// Memoize with custom comparison to prevent unnecessary re-renders
+// Only re-render if cursor position, name, or color changes
+export default React.memo(Cursor, (prevProps, nextProps) => {
+  return (
+    prevProps.cursorData.x === nextProps.cursorData.x &&
+    prevProps.cursorData.y === nextProps.cursorData.y &&
+    prevProps.cursorData.name === nextProps.cursorData.name &&
+    prevProps.cursorData.color === nextProps.cursorData.color
+  );
+});

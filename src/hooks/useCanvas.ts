@@ -212,9 +212,7 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
       .filter((p): p is Promise<void> => p !== undefined);
     
     if (promises.length > 0) {
-      console.log(`⏳ Waiting for ${promises.length} pending throttled updates to complete...`);
       await Promise.all(promises);
-      console.log(`✅ All pending throttled updates completed`);
     }
   }, []);
   
@@ -228,14 +226,11 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
         // This fires AFTER the throttle delay
         try {
           await updateObject(objectId, updates);
-          console.log(`✅ Throttled update sent to Firestore for ${objectId}`);
           
           // Remove from pending updates and cleanup
           pendingUpdatesRef.current.delete(objectId);
           throttledFunctionsRef.current.delete(objectId);
         } catch (error) {
-          console.error(`❌ Throttled update failed for ${objectId}:`, error);
-          
           // Rollback to last known good state
           setObjects([...lastKnownGoodStateRef.current]);
           toast('Update failed, changes reverted', 'error');
@@ -261,7 +256,6 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
             resolveCurrentPromise = resolve;
           });
           pendingPromisesRef.current.set(objectId, promise);
-          console.log(`📝 Queued throttled update for ${objectId}`);
         }
         
         // Call the throttled function (will fire after delay)
@@ -319,7 +313,6 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
       // Store current state for potential rollback
       const currentObject = objects.find(obj => obj.id === objectId);
       if (!currentObject) {
-        console.warn(`Object ${objectId} not found for update`);
         return null;
       }
 
@@ -344,7 +337,6 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
       return updatedObject;
 
     } catch (error) {
-      console.error('❌ Object update failed:', error);
       toast('Update failed', 'error');
       return null;
     }
@@ -377,14 +369,11 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
       await flushPendingUpdates(objectIds);
 
       // 3. Send batch update to Firestore (after all throttled updates are done)
-      console.log('📤 Sending batch update to Firestore for', updates.size, 'objects...');
       await batchUpdateObjects(updates);
       
-      console.log('✅ Batch update completed successfully');
       return true;
 
     } catch (error) {
-      console.error('❌ Batch update failed:', error);
       
       // Rollback to last known good state
       setObjects([...lastKnownGoodStateRef.current]);
@@ -400,23 +389,18 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
       // Store object for potential rollback
       const objectToDelete = objects.find(obj => obj.id === objectId);
       if (!objectToDelete) {
-        console.warn(`Object ${objectId} not found for deletion`);
         return false;
       }
 
       // 1. Remove locally (optimistic)
-      console.log('🗑️ Deleting object optimistically:', objectId);
       setObjects(prev => prev.filter(obj => obj.id !== objectId));
 
       // 2. Send deletion to Firestore
-      console.log('📤 Sending deletion to Firestore...');
       await deleteObject(objectId);
 
-      console.log('✅ Object deletion completed successfully');
       return true;
 
     } catch (error) {
-      console.error('❌ Object deletion failed:', error);
       
       // Rollback: restore the deleted object
       setObjects(prev => [...prev, objects.find(obj => obj.id === objectId)!]);
@@ -488,7 +472,6 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
       }
       return success;
     } catch (error) {
-      console.error('Failed to acquire lock:', error);
       toast('Failed to lock object', 'error');
       return false;
     }
@@ -497,18 +480,13 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
   // Release lock on an object
   const releaseObjectLock = useCallback(async (objectId: string): Promise<boolean> => {
     if (!userId) {
-      console.warn('Cannot release lock: user ID not provided');
       return false;
     }
 
     try {
       const success = await releaseLock(objectId, userId);
-      if (success) {
-        console.log(`🔓 Lock released on ${objectId}`);
-      }
       return success;
     } catch (error) {
-      console.error('Failed to release lock:', error);
       return false;
     }
   }, [userId]);

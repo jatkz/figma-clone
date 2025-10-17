@@ -44,10 +44,7 @@ const Circle: React.FC<CircleProps> = ({
     if (isSelected) {
       onDeselect();
     } else {
-      const canSelect = onSelect(circle.id, shiftKey);
-      if (!canSelect) {
-        console.warn('Could not select circle - lock acquisition failed');
-      }
+      onSelect(circle.id, shiftKey);
     }
   };
 
@@ -196,4 +193,4 @@ const Circle: React.FC<CircleProps> = ({
   );
 };
 
-export default Circle;
+export default React.memo(Circle);
