@@ -25,7 +25,6 @@ interface UseCanvasState {
 interface UseCanvasActions {
   createObjectOptimistic: (objectData: CanvasObjectInput) => Promise<CanvasObject | null>;
   updateObjectOptimistic: (objectId: string, updates: CanvasObjectUpdate) => Promise<CanvasObject | null>;
-  updateObjectLocal: (objectId: string, updates: Partial<CanvasObject>) => void;
   batchUpdateObjectsOptimistic: (updates: Map<string, CanvasObjectUpdate>) => Promise<boolean>;
   deleteObjectOptimistic: (objectId: string) => Promise<boolean>;
   deleteAllObjectsOptimistic: () => Promise<boolean>;
@@ -46,12 +45,16 @@ const defaultToast: ToastFunction = (message: string, type: string = 'info') => 
   console.log(`[${type.toUpperCase()}] ${message}`);
 };
 
-// Throttle utility for batching updates
-const throttle = <T extends (...args: any[]) => void>(func: T, delay: number): T => {
+// Throttle utility with cancellation support
+type ThrottledFunction<T extends (...args: any[]) => void> = T & {
+  cancel: () => void;
+};
+
+const throttle = <T extends (...args: any[]) => void>(func: T, delay: number): ThrottledFunction<T> => {
   let timeoutId: number | null = null;
   let lastArgs: Parameters<T> | null = null;
 
-  return ((...args: Parameters<T>) => {
+  const throttled = ((...args: Parameters<T>) => {
     lastArgs = args;
     
     if (timeoutId === null) {
@@ -63,7 +66,17 @@ const throttle = <T extends (...args: any[]) => void>(func: T, delay: number): T
         lastArgs = null;
       }, delay);
     }
-  }) as T;
+  }) as ThrottledFunction<T>;
+
+  throttled.cancel = () => {
+    if (timeoutId !== null) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+      lastArgs = null;
+    }
+  };
+
+  return throttled;
 };
 
 /**
@@ -81,6 +94,8 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const lastKnownGoodStateRef = useRef<CanvasObject[]>([]);
   const pendingUpdatesRef = useRef<Map<string, CanvasObjectUpdate>>(new Map());
+  const throttledFunctionsRef = useRef<Map<string, ThrottledFunction<any>>>(new Map());
+  const pendingPromisesRef = useRef<Map<string, Promise<void>>>(new Map());
 
   // Initialize canvas and set up real-time subscription
   useEffect(() => {
@@ -187,28 +202,76 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
   }, [userId, isConnected]);
 
   // Throttled object update function (configurable via environment variable)
-  const objectThrottle = parseInt(import.meta.env.VITE_OBJECT_SYNC_THROTTLE) || 250;
-  const throttledObjectUpdate = useCallback(
-    throttle(async (objectId: string, updates: CanvasObjectUpdate) => {
-      try {
-        await updateObject(objectId, updates);
-        console.log(`✅ Throttled update sent to Firestore for ${objectId}`);
+  // Reduced to 100ms for smoother real-time collaboration during drag
+  const objectThrottle = parseInt(import.meta.env.VITE_OBJECT_SYNC_THROTTLE) || 100;
+  
+  // Helper to flush (wait for) pending updates for specific objects
+  const flushPendingUpdates = useCallback(async (objectIds: string[]) => {
+    const promises = objectIds
+      .map(objectId => pendingPromisesRef.current.get(objectId))
+      .filter((p): p is Promise<void> => p !== undefined);
+    
+    if (promises.length > 0) {
+      console.log(`⏳ Waiting for ${promises.length} pending throttled updates to complete...`);
+      await Promise.all(promises);
+      console.log(`✅ All pending throttled updates completed`);
+    }
+  }, []);
+  
+  // Get or create throttled function for a specific object
+  const getThrottledUpdate = useCallback((objectId: string) => {
+    if (!throttledFunctionsRef.current.has(objectId)) {
+      // Store resolve function so we can create promise before throttle fires
+      let resolveCurrentPromise: (() => void) | null = null;
+      
+      const throttledFn = throttle(async (updates: CanvasObjectUpdate) => {
+        // This fires AFTER the throttle delay
+        try {
+          await updateObject(objectId, updates);
+          console.log(`✅ Throttled update sent to Firestore for ${objectId}`);
+          
+          // Remove from pending updates and cleanup
+          pendingUpdatesRef.current.delete(objectId);
+          throttledFunctionsRef.current.delete(objectId);
+        } catch (error) {
+          console.error(`❌ Throttled update failed for ${objectId}:`, error);
+          
+          // Rollback to last known good state
+          setObjects([...lastKnownGoodStateRef.current]);
+          toast('Update failed, changes reverted', 'error');
+          
+          // Clear pending update and cleanup
+          pendingUpdatesRef.current.delete(objectId);
+          throttledFunctionsRef.current.delete(objectId);
+        } finally {
+          // Resolve the promise after throttle completes (or fails)
+          if (resolveCurrentPromise) {
+            resolveCurrentPromise();
+            resolveCurrentPromise = null;
+          }
+          pendingPromisesRef.current.delete(objectId);
+        }
+      }, objectThrottle);
+      
+      // Wrap the throttled function to create promise IMMEDIATELY
+      const wrappedFn = (updates: CanvasObjectUpdate) => {
+        // Create promise BEFORE calling throttle (so it's tracked immediately)
+        if (!pendingPromisesRef.current.has(objectId)) {
+          const promise = new Promise<void>((resolve) => {
+            resolveCurrentPromise = resolve;
+          });
+          pendingPromisesRef.current.set(objectId, promise);
+          console.log(`📝 Queued throttled update for ${objectId}`);
+        }
         
-        // Remove from pending updates since it succeeded
-        pendingUpdatesRef.current.delete(objectId);
-      } catch (error) {
-        console.error(`❌ Throttled update failed for ${objectId}:`, error);
-        
-        // Rollback to last known good state
-        setObjects([...lastKnownGoodStateRef.current]);
-        toast('Update failed, changes reverted', 'error');
-        
-        // Clear pending update
-        pendingUpdatesRef.current.delete(objectId);
-      }
-    }, objectThrottle),
-    [objectThrottle]
-  );
+        // Call the throttled function (will fire after delay)
+        throttledFn(updates);
+      };
+      
+      throttledFunctionsRef.current.set(objectId, wrappedFn as any);
+    }
+    return throttledFunctionsRef.current.get(objectId)!;
+  }, [objectThrottle, toast]);
 
   // Optimistic object creation
   const createObjectOptimistic = useCallback(async (
@@ -273,9 +336,10 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
         )
       );
 
-      // 2. Store pending update and use throttled object update
+      // 2. Store pending update and use per-object throttled update
       pendingUpdatesRef.current.set(objectId, updates);
-      throttledObjectUpdate(objectId, updates);
+      const throttledFn = getThrottledUpdate(objectId);
+      throttledFn(updates);
 
       return updatedObject;
 
@@ -284,19 +348,7 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
       toast('Update failed', 'error');
       return null;
     }
-  }, [objects, throttledObjectUpdate]);
-
-  // Local-only update (no Firebase call) - used for real-time visual feedback during group drag
-  const updateObjectLocal = useCallback((
-    objectId: string,
-    updates: Partial<CanvasObject>
-  ): void => {
-    setObjects(prev =>
-      prev.map(obj =>
-        obj.id === objectId ? { ...obj, ...updates } as CanvasObject : obj
-      )
-    );
-  }, []);
+  }, [objects, getThrottledUpdate]);
 
   // Batch optimistic update for multiple objects (used for alignment, distribution, multi-drag)
   const batchUpdateObjectsOptimistic = useCallback(async (
@@ -320,7 +372,11 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
         prev.map(obj => updatedObjectsMap.has(obj.id) ? updatedObjectsMap.get(obj.id)! : obj)
       );
 
-      // 2. Send batch update to Firestore immediately (no throttling for batch operations)
+      // 2. Wait for any pending throttled updates to complete first (prevents race condition)
+      const objectIds = Array.from(updates.keys());
+      await flushPendingUpdates(objectIds);
+
+      // 3. Send batch update to Firestore (after all throttled updates are done)
       console.log('📤 Sending batch update to Firestore for', updates.size, 'objects...');
       await batchUpdateObjects(updates);
       
@@ -336,7 +392,7 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
       
       return false;
     }
-  }, [objects, toast]);
+  }, [objects, toast, flushPendingUpdates]);
 
   // Optimistic object deletion
   const deleteObjectOptimistic = useCallback(async (objectId: string): Promise<boolean> => {
@@ -467,7 +523,6 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
     // Actions
     createObjectOptimistic,
     updateObjectOptimistic,
-    updateObjectLocal,
     batchUpdateObjectsOptimistic,
     deleteObjectOptimistic,
     deleteAllObjectsOptimistic,

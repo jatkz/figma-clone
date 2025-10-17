@@ -136,7 +136,6 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     isConnected,
     createObjectOptimistic,
     updateObjectOptimistic,
-    updateObjectLocal,
     batchUpdateObjectsOptimistic,
     deleteObjectOptimistic,
     acquireObjectLock,
@@ -1236,6 +1235,11 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
       return;
     }
 
+    // Update cursor position during drag so other users can see where you're dragging
+    if (user?.id) {
+      throttledCursorUpdate(x, y);
+    }
+
     // Check if this is a group drag (multi-select)
     const isInSelection = selectedObjectIds.includes(objectId);
     if (isInSelection && selectedObjectIds.length > 1) {
@@ -1264,11 +1268,12 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
           const dimensions = getShapeDimensions(selectedObj);
           const constrainedPosition = constrainToBounds(newX, newY, dimensions.width, dimensions.height);
           
-          // Use LOCAL update only (no Firebase) for instant visual feedback during drag
-          // This prevents throttled updates from conflicting with the batch update at drag end
-          updateObjectLocal(selectedId, {
+          // Use throttled updates for real-time collaboration visibility
+          // The batch update at drag end will cancel any pending throttled updates
+          updateObjectOptimistic(selectedId, {
             x: constrainedPosition.x,
-            y: constrainedPosition.y
+            y: constrainedPosition.y,
+            modifiedBy: user.id
           });
         }
       });
@@ -1308,7 +1313,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
         modifiedBy: user.id
       });
     }
-  }, [user?.id, updateObjectOptimistic, updateObjectLocal, objects, selectedObjectIds, snapSettings, isModifierPressed]);
+  }, [user?.id, updateObjectOptimistic, objects, selectedObjectIds, snapSettings, isModifierPressed, setSnapGuides, groupDragStartPositions, viewport, throttledCursorUpdate]);
 
   const handleRectangleDragEnd = useCallback(async (objectId: string, x: number, y: number) => {
     // Verify the user still has the lock 
