@@ -1,5 +1,5 @@
-import React, { useRef, useState, useCallback, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
-import { Stage, Layer, Line, Rect, Text, Group } from 'react-konva';
+import React, { useRef, useState, useCallback, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { Stage, Layer, Rect, Line } from 'react-konva';
 import Konva from 'konva';
 import {
   CANVAS_WIDTH,
@@ -9,11 +9,6 @@ import {
   type CanvasObject
 } from '../types/canvas';
 import type { ToolType } from './ToolPanel';
-import Rectangle from './Rectangle';
-import CircleComponent from './Circle';
-import TextObjectComponent from './TextObject';
-import ResizeHandles from './ResizeHandles';
-import RotationHandle from './RotationHandle';
 import TextFormattingToolbar from './TextFormattingToolbar';
 import TextEditorOverlay from './TextEditorOverlay';
 import { useResize } from '../hooks/useResize';
@@ -35,9 +30,12 @@ import { initializeAICanvasState, cleanupAICanvasState } from '../services/aiCan
 import { exportToSVG, exportToPNG, generatePreview, type ExportOptions } from '../utils/canvasExport';
 import { useSnap } from '../contexts/SnapContext';
 import type { SnapGuide } from '../types/snap';
-import SnapGuides from './SnapGuides';
-import Cursor from './Cursor';
 import type { AlignmentType, DistributionType } from '../utils/alignmentUtils';
+import { screenToCanvasCoords, stageToCanvasCoords } from '../utils/canvasCoordinates';
+import { getCanvasCursor } from '../utils/canvasHelpers';
+import CanvasObjects from './canvas/CanvasObjects';
+import SelectionOverlay from './canvas/SelectionOverlay';
+import CanvasControls from './canvas/CanvasControls';
 
 // Throttle utility for cursor updates
 const throttle = <T extends (...args: any[]) => void>(func: T, delay: number): T => {
@@ -230,11 +228,9 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     userId: user?.id
   });
 
-  // Convert screen coordinates to canvas coordinates (accounting for zoom/pan)
-  const screenToCanvasCoords = useCallback((screenX: number, screenY: number) => {
-    const canvasX = (screenX - viewport.x) / viewport.scale;
-    const canvasY = (screenY - viewport.y) / viewport.scale;
-    return { x: canvasX, y: canvasY };
+  // Wrapper for coordinate transformation utilities (memoized with viewport)
+  const screenToCanvasCoordsCallback = useCallback((screenX: number, screenY: number) => {
+    return screenToCanvasCoords(screenX, screenY, viewport);
   }, [viewport]);
 
   // Lasso selection (extracted to custom hook)
@@ -251,7 +247,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     setSelectedObjectIds,
     acquireMultipleLocks,
     releaseMultipleLocks,
-    screenToCanvasCoords,
+    screenToCanvasCoords: screenToCanvasCoordsCallback,
     viewport,
     toastFunction
   });
@@ -278,7 +274,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     handleCreateText
   } = useCanvasObjectCreation({
     user,
-    screenToCanvasCoords,
+    screenToCanvasCoords: screenToCanvasCoordsCallback,
     createObjectOptimistic
   });
 
@@ -313,15 +309,6 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
   // Cursor position state for multiplayer cursor tracking
   const [, setCursorPosition] = useState<{ x: number; y: number } | null>(null);
 
-  // Sort objects by type to ensure proper layering (text on top)
-  // Memoized to avoid re-sorting on every render
-  const sortedObjects = useMemo(() => {
-    return [...objects].sort((a, b) => {
-      // Render order: rectangles first, then circles, then text (text on top)
-      const typeOrder: Record<string, number> = { rectangle: 0, circle: 1, text: 2 };
-      return (typeOrder[a.type] || 0) - (typeOrder[b.type] || 0);
-    });
-  }, [objects]);
 
   // Clear lasso state when switching away from lasso tool
   useEffect(() => {
@@ -384,10 +371,9 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
   }, []);
 
   // Convert stage coordinates to canvas coordinates for cursor tracking
-  const stageToCanvasCoords = useCallback((stageX: number, stageY: number) => {
-    // Stage coordinates are already in the viewport space, so we can use the same conversion
-    return screenToCanvasCoords(stageX, stageY);
-  }, [screenToCanvasCoords]);
+  const stageToCanvasCoordsCallback = useCallback((stageX: number, stageY: number) => {
+    return stageToCanvasCoords(stageX, stageY, viewport);
+  }, [viewport]);
 
   // Handle text formatting updates
   const handleTextFormattingUpdate = useCallback((textObjectId: string, updates: Partial<CanvasObject>) => {
@@ -729,14 +715,14 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     }
 
     // Always track cursor position for multiplayer (convert to canvas coordinates)
-    const canvasCoords = stageToCanvasCoords(pos.x, pos.y);
+    const canvasCoords = stageToCanvasCoordsCallback(pos.x, pos.y);
     setCursorPosition(canvasCoords);
     
     // Throttled update to Firestore (only if user is authenticated)
     if (user?.id) {
       throttledCursorUpdate(canvasCoords.x, canvasCoords.y);
     }
-  }, [isPanning, lastPointerPosition, viewport, constrainViewport, stageToCanvasCoords, user?.id, throttledCursorUpdate, editingTextId, lassoState.isDrawing, handleLassoMove]);
+  }, [isPanning, lastPointerPosition, viewport, constrainViewport, stageToCanvasCoordsCallback, user?.id, throttledCursorUpdate, editingTextId, lassoState.isDrawing, handleLassoMove]);
 
   // Handle mouse up to stop panning and complete lasso
   const handleMouseUp = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -829,12 +815,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
         onWheel={handleWheel}
         draggable={false} // We handle dragging manually for better control
         style={{
-          cursor: isPanning ? 'grabbing' : 
-                  isSpacePressed ? 'grab' :
-                  activeTool === 'lasso' ? 'crosshair' :
-                  activeTool === 'magic-wand' ? 'pointer' :
-                  (activeTool === 'rectangle' || activeTool === 'circle' || activeTool === 'text') ? 'crosshair' : 
-                  'grab'
+          cursor: getCanvasCursor(activeTool, isPanning, isSpacePressed)
         }}
       >
         <Layer>
@@ -851,199 +832,48 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
             height={CANVAS_HEIGHT}
           />
           
-          {/* Render canvas objects - sorted by type to ensure text appears on top */}
-          {sortedObjects.map(object => {
-            const userMap = new Map();
-            if (user?.id) {
-              userMap.set(user.id, {
-                displayName: user.displayName || 'You',
-                cursorColor: user.cursorColor || '#007AFF'
-              });
-            }
-            
-            const sharedProps = {
-              isSelected: selectedObjectIds.includes(object.id),
-              isFilterPreview: filterPreviewIds.includes(object.id) && !selectedObjectIds.includes(object.id),
-              onSelect: handleRectangleClick,
-              onDeselect: async () => {
-                if (selectedObjectIds.length > 0) {
-                  console.log('✅ Deselecting via onDeselect:', selectedObjectIds);
-                  await releaseMultipleLocks(selectedObjectIds);
-                  setSelectedObjectIds([]);
-                }
-              },
-              onDragStart: handleRectangleDragStart,
-              onDragMove: handleRectangleDragMove,
-              onDragEnd: handleRectangleDragEnd,
-              currentUserId: user?.id,
-              users: userMap,
-            };
+          {/* Render canvas objects */}
+          <CanvasObjects
+            objects={objects}
+            selectedObjectIds={selectedObjectIds}
+            filterPreviewIds={filterPreviewIds}
+            editingTextId={editingTextId}
+            currentUserId={user?.id}
+            onRectangleClick={handleRectangleClick}
+            onDeselect={async () => {
+              if (selectedObjectIds.length > 0) {
+                console.log('✅ Deselecting via onDeselect:', selectedObjectIds);
+                await releaseMultipleLocks(selectedObjectIds);
+                setSelectedObjectIds([]);
+              }
+            }}
+            onDragStart={handleRectangleDragStart}
+            onDragMove={handleRectangleDragMove}
+            onDragEnd={handleRectangleDragEnd}
+            onStartTextEdit={handleStartTextEdit}
+          />
 
-            switch (object.type) {
-              case 'rectangle':
-                return (
-                  <Rectangle
-                    key={object.id}
-                    {...sharedProps}
-                    object={object}
-                    onClick={handleRectangleClick}
-                  />
-                );
-              case 'circle':
-                return (
-                  <CircleComponent
-                    key={object.id}
-                    {...sharedProps}
-                    circle={object}
-                  />
-                );
-              case 'text':
-                return (
-                  <TextObjectComponent
-                    key={object.id}
-                    {...sharedProps}
-                    textObject={object}
-                    isEditing={editingTextId === object.id}
-                    onStartEdit={handleStartTextEdit}
-                  />
-                );
-              default:
-                return null;
-            }
-          })}
+          {/* Selection overlay (resize handles, rotation handle, tooltips) */}
+          <SelectionOverlay
+            objects={objects}
+            selectedObjectIds={selectedObjectIds}
+            currentUserId={user?.id}
+            resizeDimensions={resizeDimensions}
+            onResizeStart={handleResizeStart}
+            onResize={handleResize}
+            onResizeEnd={handleResizeEnd}
+            onRotationStart={handleRotationStart}
+            onRotation={handleRotation}
+            onRotationEnd={handleRotationEnd}
+          />
 
-          {/* Resize handles for selected object (only single selection) */}
-          {selectedObjectIds.length === 1 && (() => {
-            const selectedObject = objects.find(obj => obj.id === selectedObjectIds[0]);
-            if (selectedObject && selectedObject.lockedBy === user?.id) {
-              return (
-                <ResizeHandles
-                  object={selectedObject}
-                  onResizeStart={handleResizeStart}
-                  onResize={handleResize}
-                  onResizeEnd={handleResizeEnd}
-                />
-              );
-            }
-            return null;
-          })()}
-
-          {/* Rotation handle for selected object (only single selection) */}
-          {selectedObjectIds.length === 1 && (() => {
-            const selectedObject = objects.find(obj => obj.id === selectedObjectIds[0]);
-            if (selectedObject && selectedObject.lockedBy === user?.id) {
-              return (
-                <RotationHandle
-                  object={selectedObject}
-                  onRotationStart={handleRotationStart}
-                  onRotation={handleRotation}
-                  onRotationEnd={handleRotationEnd}
-                />
-              );
-            }
-            return null;
-          })()}
-
-          {/* Dimension tooltip during resize */}
-          {resizeDimensions && (
-            <Group x={resizeDimensions.x} y={resizeDimensions.y}>
-              <Rect
-                x={-40}
-                y={-15}
-                width={80}
-                height={30}
-                fill="rgba(0, 0, 0, 0.8)"
-                cornerRadius={4}
-              />
-              <Text
-                x={-40}
-                y={-10}
-                width={80}
-                height={20}
-                text={`${resizeDimensions.width} × ${resizeDimensions.height}`}
-                fontSize={12}
-                fill="white"
-                align="center"
-                verticalAlign="middle"
-              />
-            </Group>
-          )}
-
-          {/* Selection count badge (multi-select visual feedback) */}
-          {selectedObjectIds.length > 1 && (
-            <Group x={20} y={20}>
-              <Rect
-                x={0}
-                y={0}
-                width={120}
-                height={32}
-                fill="rgba(123, 97, 255, 0.9)"
-                cornerRadius={6}
-                shadowColor="black"
-                shadowBlur={4}
-                shadowOpacity={0.3}
-                shadowOffsetY={2}
-              />
-              <Text
-                x={0}
-                y={0}
-                width={120}
-                height={32}
-                text={`${selectedObjectIds.length} objects`}
-                fontSize={14}
-                fontStyle="bold"
-                fill="white"
-                align="center"
-                verticalAlign="middle"
-              />
-            </Group>
-          )}
-
-          {/* Render other users' cursors (teleport positioning - instant updates) */}
-          {Array.from(otherCursors.entries()).map(([userId, cursorData]) => (
-            <Cursor
-              key={userId}
-              userId={userId}
-              cursorData={cursorData}
-            />
-          ))}
-          
-          {/* Snap guides (smart alignment guides) */}
-          <SnapGuides guides={snapGuides} scale={viewport.scale} />
-          
-          {/* Lasso path visualization */}
-          {lassoState.isDrawing && lassoState.points.length >= 2 && (
-            <React.Fragment>
-              <Line
-                points={lassoState.points}
-                stroke="#7B61FF"
-                strokeWidth={2 / viewport.scale}
-                dash={[10 / viewport.scale, 5 / viewport.scale]}
-                lineCap="round"
-                lineJoin="round"
-                opacity={0.8}
-                closed={false}
-                listening={false}
-              />
-              
-              {/* Closing indicator circle at start point */}
-              {lassoState.isClosing && (
-                <React.Fragment>
-                  <Rect
-                    x={lassoState.points[0] - 10 / viewport.scale}
-                    y={lassoState.points[1] - 10 / viewport.scale}
-                    width={20 / viewport.scale}
-                    height={20 / viewport.scale}
-                    stroke="#7B61FF"
-                    strokeWidth={2 / viewport.scale}
-                    fill="rgba(123, 97, 255, 0.2)"
-                    cornerRadius={10 / viewport.scale}
-                    listening={false}
-                  />
-                </React.Fragment>
-              )}
-            </React.Fragment>
-          )}
+          {/* Canvas controls (snap guides, lasso, cursors) */}
+          <CanvasControls
+            snapGuides={snapGuides}
+            viewportScale={viewport.scale}
+            lassoState={lassoState}
+            otherCursors={otherCursors}
+          />
         </Layer>
       </Stage>
     </div>
