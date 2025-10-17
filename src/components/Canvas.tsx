@@ -18,23 +18,26 @@ import TextFormattingToolbar from './TextFormattingToolbar';
 import TextEditorOverlay from './TextEditorOverlay';
 import { useResize } from '../hooks/useResize';
 import { useRotation } from '../hooks/useRotation';
-import { createNewRectangle, createNewCircle, createNewText, isWithinCanvasBounds, generateTempId } from '../utils/shapeFactory';
+import { useCanvasSelection } from '../hooks/useCanvasSelection';
+import { useCanvasDrag } from '../hooks/useCanvasDrag';
+import { useLassoSelection } from '../hooks/useLassoSelection';
+import { useCanvasAlignment } from '../hooks/useCanvasAlignment';
+import { useCanvasObjectCreation } from '../hooks/useCanvasObjectCreation';
+import { useCanvasViewport } from '../hooks/useCanvasViewport';
+import { generateTempId } from '../utils/shapeFactory';
 import { constrainToBounds } from '../utils/constrainToBounds';
 import { getShapeDimensions } from '../utils/shapeUtils';
 import { useAuth } from '../hooks/useAuth';
 import { useCanvas } from '../hooks/useCanvas';
 import { useToastContext, createToastFunction } from '../contexts/ToastContext';
-import { updateCursor, subscribeToCursors, type CursorData, type CanvasObjectUpdate } from '../services/canvasService';
+import { updateCursor, subscribeToCursors, type CursorData } from '../services/canvasService';
 import { initializeAICanvasState, cleanupAICanvasState } from '../services/aiCanvasService';
 import { exportToSVG, exportToPNG, generatePreview, type ExportOptions } from '../utils/canvasExport';
-import { applySnapping } from '../utils/snapUtils';
 import { useSnap } from '../contexts/SnapContext';
 import type { SnapGuide } from '../types/snap';
 import SnapGuides from './SnapGuides';
 import Cursor from './Cursor';
-import { isObjectInLasso, shouldCloseLasso, simplifyPath } from '../utils/lassoUtils';
-import { findObjectsByColor } from '../utils/colorUtils';
-import { alignObjects, distributeObjects, alignToCanvas, type AlignmentType, type DistributionType } from '../utils/alignmentUtils';
+import type { AlignmentType, DistributionType } from '../utils/alignmentUtils';
 
 // Throttle utility for cursor updates
 const throttle = <T extends (...args: any[]) => void>(func: T, delay: number): T => {
@@ -55,18 +58,6 @@ const throttle = <T extends (...args: any[]) => void>(func: T, delay: number): T
     }
   }) as T;
 };
-
-interface ViewportState {
-  x: number;
-  y: number;
-  scale: number;
-}
-
-interface LassoState {
-  isDrawing: boolean;
-  points: number[]; // Flat array: [x1, y1, x2, y2, ...]
-  isClosing: boolean;
-}
 
 interface CanvasProps {
   activeTool: ToolType;
@@ -102,7 +93,7 @@ export interface CanvasRef {
 }
 
 const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChange, magicWandTolerance = 15, filterPreviewIds = [] }, ref) => {
-  const stageRef = useRef<Konva.Stage>(null);
+  const stageRef = useRef<Konva.Stage | null>(null);
   const { user } = useAuth();
   
   // Toast notifications from context
@@ -121,13 +112,6 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
   const [snapGuides, setSnapGuides] = useState<SnapGuide[]>([]);
   const [isModifierPressed, setIsModifierPressed] = useState(false);
 
-  // Lasso selection state
-  const [lassoState, setLassoState] = useState<LassoState>({
-    isDrawing: false,
-    points: [],
-    isClosing: false
-  });
-
   // Real-time canvas state from Firestore
   const {
     objects,
@@ -142,11 +126,23 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     releaseObjectLock
   } = useCanvas(user?.id, toastFunction);
 
-  // Viewport state: centered at canvas center initially
-  const [viewport, setViewport] = useState<ViewportState>({
-    x: -CANVAS_CENTER_X, // Negative because we want to center the canvas
-    y: -CANVAS_CENTER_Y,
-    scale: 1.0, // Back to 100% zoom for clear canvas visibility
+  // Viewport state (extracted to custom hook)
+  const {
+    viewport,
+    setViewport,
+    constrainViewport,
+    handleWheel,
+    setZoom,
+    zoomIn,
+    zoomOut,
+    resetZoom
+  } = useCanvasViewport({
+    stageRef,
+    canvasWidth: CANVAS_WIDTH,
+    canvasHeight: CANVAS_HEIGHT,
+    canvasCenterX: CANVAS_CENTER_X,
+    canvasCenterY: CANVAS_CENTER_Y,
+    toastFunction
   });
 
   // Track if we're currently panning
@@ -155,14 +151,66 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
   const [lastPointerPosition, setLastPointerPosition] = useState({ x: 0, y: 0 });
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
 
-  // Selection state (local only, not synced) - Multi-select support
-  const [selectedObjectIds, setSelectedObjectIds] = useState<string[]>([]);
+  // Selection state and handlers (extracted to custom hook)
+  const {
+    selectedObjectIds,
+    setSelectedObjectIds,
+    acquireMultipleLocks,
+    releaseMultipleLocks,
+    handleRectangleClick,
+    handleClearSelection,
+    handleSelectAll,
+    handleSelectNext,
+    handleSelectPrevious,
+    handleSelectInverse,
+    handleSelectByType,
+    handleSelectByIds
+  } = useCanvasSelection({
+    objects,
+    user,
+    activeTool,
+    acquireObjectLock,
+    releaseObjectLock,
+    toastFunction,
+    magicWandTolerance
+  });
   
   // Text editing state (track which text object is being edited)
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   
-  // Store initial positions for group drag (to calculate accurate deltas)
-  const groupDragStartPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
+  // Throttled cursor update function (configurable via environment variable)
+  const cursorThrottle = parseInt(import.meta.env.VITE_CURSOR_SYNC_THROTTLE) || 250;
+  const throttledCursorUpdate = useCallback(
+    throttle(async (x: number, y: number) => {
+      if (!user?.id || !user?.displayName || !user?.cursorColor) {
+        return;
+      }
+      
+      try {
+        await updateCursor(user.id, x, y, user.displayName, user.cursorColor);
+      } catch (error) {
+        console.warn('Failed to update cursor position:', error);
+      }
+    }, cursorThrottle),
+    [user?.id, user?.displayName, user?.cursorColor, cursorThrottle]
+  );
+  
+  // Drag handlers (extracted to custom hook)
+  const {
+    handleRectangleDragStart,
+    handleRectangleDragMove,
+    handleRectangleDragEnd
+  } = useCanvasDrag({
+    objects,
+    selectedObjectIds,
+    user,
+    updateObjectOptimistic,
+    batchUpdateObjectsOptimistic,
+    throttledCursorUpdate,
+    snapSettings,
+    isModifierPressed,
+    setSnapGuides
+  });
 
   // Resize functionality (extracted to custom hook)
   // Only works on single selection - pass first selected ID or null
@@ -180,6 +228,58 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     objects,
     updateObjectOptimistic,
     userId: user?.id
+  });
+
+  // Convert screen coordinates to canvas coordinates (accounting for zoom/pan)
+  const screenToCanvasCoords = useCallback((screenX: number, screenY: number) => {
+    const canvasX = (screenX - viewport.x) / viewport.scale;
+    const canvasY = (screenY - viewport.y) / viewport.scale;
+    return { x: canvasX, y: canvasY };
+  }, [viewport]);
+
+  // Lasso selection (extracted to custom hook)
+  const {
+    lassoState,
+    setLassoState,
+    handleLassoStart,
+    handleLassoMove,
+    handleLassoComplete
+  } = useLassoSelection({
+    activeTool,
+    objects,
+    selectedObjectIds,
+    setSelectedObjectIds,
+    acquireMultipleLocks,
+    releaseMultipleLocks,
+    screenToCanvasCoords,
+    viewport,
+    toastFunction
+  });
+
+  // Alignment and distribution (extracted to custom hook)
+  const {
+    handleAlign,
+    handleDistribute,
+    handleAlignToCanvas
+  } = useCanvasAlignment({
+    objects,
+    selectedObjectIds,
+    user,
+    batchUpdateObjectsOptimistic,
+    toastFunction,
+    canvasWidth: CANVAS_WIDTH,
+    canvasHeight: CANVAS_HEIGHT
+  });
+
+  // Object creation (extracted to custom hook)
+  const {
+    handleCreateRectangle,
+    handleCreateCircle,
+    handleCreateText
+  } = useCanvasObjectCreation({
+    user,
+    screenToCanvasCoords,
+    createObjectOptimistic
   });
 
   // Notify parent when selection changes
@@ -223,49 +323,8 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     });
   }, [objects]);
 
-  // Helper: Acquire locks on multiple objects (returns successfully locked IDs)
-  const acquireMultipleLocks = useCallback(async (objectIds: string[]): Promise<string[]> => {
-    const lockedIds: string[] = [];
-    
-    for (const objectId of objectIds) {
-      const targetObject = objects.find(obj => obj.id === objectId);
-      let lockingUserName = 'Unknown User';
-      
-      if (targetObject?.lockedBy && targetObject.lockedBy !== user?.id) {
-        lockingUserName = 'Another User';
-      }
-      
-      const lockAcquired = await acquireObjectLock(objectId, lockingUserName);
-      if (lockAcquired) {
-        lockedIds.push(objectId);
-      }
-    }
-    
-    return lockedIds;
-  }, [objects, user?.id, acquireObjectLock]);
-
-  // Helper: Release locks on multiple objects
-  const releaseMultipleLocks = useCallback(async (objectIds: string[]): Promise<void> => {
-    for (const objectId of objectIds) {
-      await releaseObjectLock(objectId);
-    }
-  }, [releaseObjectLock]);
-
-  // Auto-deselect objects when switching to creation tools
+  // Clear lasso state when switching away from lasso tool
   useEffect(() => {
-    const isCreationTool = activeTool === 'rectangle' || activeTool === 'circle' || activeTool === 'text';
-    
-    if (isCreationTool && selectedObjectIds.length > 0) {
-      // Release all locks and deselect when switching to creation tools
-      const deselectObjects = async () => {
-        await releaseMultipleLocks(selectedObjectIds);
-        setSelectedObjectIds([]);
-      };
-      
-      deselectObjects();
-    }
-    
-    // Clear lasso state when switching away from lasso tool
     if (activeTool !== 'lasso' && lassoState.isDrawing) {
       setLassoState({
         isDrawing: false,
@@ -273,27 +332,10 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
         isClosing: false
       });
     }
-  }, [activeTool, selectedObjectIds, releaseMultipleLocks, lassoState.isDrawing]);
+  }, [activeTool, lassoState.isDrawing]);
 
   // Other users' cursors from Firestore
   const [otherCursors, setOtherCursors] = useState<Map<string, CursorData>>(new Map());
-
-  // Throttled cursor update function (configurable via environment variable)
-  const cursorThrottle = parseInt(import.meta.env.VITE_CURSOR_SYNC_THROTTLE) || 250;
-  const throttledCursorUpdate = useCallback(
-    throttle(async (x: number, y: number) => {
-      if (!user?.id || !user?.displayName || !user?.cursorColor) {
-        return;
-      }
-      
-      try {
-        await updateCursor(user.id, x, y, user.displayName, user.cursorColor);
-      } catch (error) {
-        console.warn('Failed to update cursor position:', error);
-      }
-    }, cursorThrottle),
-    [user?.id, user?.displayName, user?.cursorColor, cursorThrottle]
-  );
 
   // Update stage size on window resize
   useEffect(() => {
@@ -341,222 +383,11 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     };
   }, []);
 
-  // Constrain viewport to boundaries
-  const constrainViewport = useCallback((newViewport: ViewportState): ViewportState => {
-    const stage = stageRef.current;
-    if (!stage) return newViewport;
-
-    const stageWidth = stage.width();
-    const stageHeight = stage.height();
-
-    // Calculate the visible area bounds at current scale
-    const minX = -CANVAS_WIDTH * newViewport.scale;
-    const maxX = stageWidth;
-    const minY = -CANVAS_HEIGHT * newViewport.scale;
-    const maxY = stageHeight;
-
-    return {
-      ...newViewport,
-      x: Math.max(minX, Math.min(maxX, newViewport.x)),
-      y: Math.max(minY, Math.min(maxY, newViewport.y)),
-      scale: Math.max(0.1, Math.min(4.0, newViewport.scale)),
-    };
-  }, []);
-
-  // Handle magic wand click (select all objects with matching color)
-  const handleMagicWandClick = useCallback(async (objectId: string, shiftKey: boolean = false) => {
-    if (activeTool !== 'magic-wand') return;
-    
-    // Find the clicked object
-    const clickedObject = objects.find(obj => obj.id === objectId);
-    if (!clickedObject) return;
-    
-    // Find all objects with matching color (within tolerance)
-    const matchingObjects = findObjectsByColor(objects, clickedObject.color, magicWandTolerance);
-    
-    if (matchingObjects.length === 0) {
-      toastFunction('No objects with matching color found', 'info', 1500);
-      return;
-    }
-    
-    const matchingIds = matchingObjects.map(obj => obj.id);
-    
-    let newSelection: string[];
-    
-    if (shiftKey) {
-      // Shift: Add to current selection
-      newSelection = [...new Set([...selectedObjectIds, ...matchingIds])];
-    } else {
-      // No modifier: Replace selection
-      await releaseMultipleLocks(selectedObjectIds);
-      newSelection = matchingIds;
-    }
-    
-    // Try to acquire locks on the new selection
-    const lockedIds = await acquireMultipleLocks(newSelection);
-    setSelectedObjectIds(lockedIds);
-    
-    // Show feedback
-    if (lockedIds.length > 0) {
-      const totalCount = newSelection.length;
-      if (lockedIds.length === totalCount) {
-        toastFunction(`Selected ${lockedIds.length} object${lockedIds.length > 1 ? 's' : ''} with matching color`, 'success', 1500);
-      } else {
-        const lockedCount = totalCount - lockedIds.length;
-        toastFunction(`Selected ${lockedIds.length} of ${totalCount} objects. ${lockedCount} locked by others`, 'warning', 2000);
-      }
-    }
-  }, [activeTool, objects, magicWandTolerance, selectedObjectIds, acquireMultipleLocks, releaseMultipleLocks, toastFunction]);
-
-  // Handle rectangle click with locking and enhanced messaging (now supports Shift+Click multi-select)
-  const handleRectangleClick = useCallback(async (objectId: string, shiftKey: boolean = false) => {
-    // Magic wand takes precedence
-    if (activeTool === 'magic-wand') {
-      await handleMagicWandClick(objectId, shiftKey);
-      return;
-    }
-    
-    if (activeTool === 'select') {
-      // Shift+Click: Add/remove from selection
-      if (shiftKey) {
-        const isAlreadySelected = selectedObjectIds.includes(objectId);
-        
-        if (isAlreadySelected) {
-          // Remove from selection
-          await releaseObjectLock(objectId);
-          setSelectedObjectIds(prev => prev.filter(id => id !== objectId));
-          toastFunction('Object removed from selection', 'success', 1500);
-        } else {
-          // Add to selection
-          const targetObject = objects.find(obj => obj.id === objectId);
-          let lockingUserName = 'Unknown User';
-          
-          if (targetObject?.lockedBy && targetObject.lockedBy !== user?.id) {
-            lockingUserName = 'Another User';
-          }
-          
-          const lockAcquired = await acquireObjectLock(objectId, lockingUserName);
-          if (lockAcquired) {
-            setSelectedObjectIds(prev => [...prev, objectId]);
-            const newCount = selectedObjectIds.length + 1;
-            toastFunction(`${newCount} object${newCount > 1 ? 's' : ''} selected`, 'success', 1500);
-          }
-        }
-        return;
-      }
-      
-      // Regular click (no Shift): Single selection
-      const isAlreadySelected = selectedObjectIds.includes(objectId);
-      
-      if (isAlreadySelected && selectedObjectIds.length === 1) {
-        // Clicking the only selected object: deselect
-        await releaseObjectLock(objectId);
-        setSelectedObjectIds([]);
-        return;
-      }
-      
-      // Clear previous selections and select this one
-      await releaseMultipleLocks(selectedObjectIds);
-      
-      const targetObject = objects.find(obj => obj.id === objectId);
-      let lockingUserName = 'Unknown User';
-      
-      if (targetObject?.lockedBy && targetObject.lockedBy !== user?.id) {
-        lockingUserName = 'Another User';
-      }
-      
-      const lockAcquired = await acquireObjectLock(objectId, lockingUserName);
-      if (lockAcquired) {
-        setSelectedObjectIds([objectId]);
-        toastFunction('Object selected for editing', 'success', 1500);
-      } else {
-        // Lock not acquired, clear selection
-        setSelectedObjectIds([]);
-      }
-    }
-  }, [activeTool, selectedObjectIds, acquireObjectLock, releaseObjectLock, releaseMultipleLocks, objects, user?.id, toastFunction]);
-
-  // Convert screen coordinates to canvas coordinates (accounting for zoom/pan)
-  const screenToCanvasCoords = useCallback((screenX: number, screenY: number) => {
-    const canvasX = (screenX - viewport.x) / viewport.scale;
-    const canvasY = (screenY - viewport.y) / viewport.scale;
-    return { x: canvasX, y: canvasY };
-  }, [viewport]);
-
   // Convert stage coordinates to canvas coordinates for cursor tracking
   const stageToCanvasCoords = useCallback((stageX: number, stageY: number) => {
     // Stage coordinates are already in the viewport space, so we can use the same conversion
     return screenToCanvasCoords(stageX, stageY);
   }, [screenToCanvasCoords]);
-
-      // Handle rectangle creation with Firestore sync
-      const handleCreateRectangle = useCallback(async (screenX: number, screenY: number) => {
-        if (!user?.id) {
-          return;
-        }
-
-        // Convert screen coordinates to canvas coordinates
-        const { x, y } = screenToCanvasCoords(screenX, screenY);
-
-        // Check if position is within canvas boundaries
-        if (!isWithinCanvasBounds(x, y)) {
-          return;
-        }
-
-        // Create new rectangle object
-        const newRectangle = createNewRectangle(x, y, user.id);
-
-        // Create with optimistic updates and Firestore sync
-        await createObjectOptimistic(newRectangle);
-        
-        // Note: Don't auto-select during creation (user is in creation mode)
-      }, [user?.id, screenToCanvasCoords, createObjectOptimistic]);
-
-  // Handle circle creation with Firestore sync
-  const handleCreateCircle = useCallback(async (screenX: number, screenY: number) => {
-    if (!user?.id) {
-      return;
-    }
-
-    // Convert screen coordinates to canvas coordinates
-    const { x, y } = screenToCanvasCoords(screenX, screenY);
-
-    // Check if position is within canvas boundaries
-    if (!isWithinCanvasBounds(x, y)) {
-      return;
-    }
-
-    // Create new circle object
-    const newCircle = createNewCircle(x, y, user.id);
-
-    // Create with optimistic updates and Firestore sync
-    await createObjectOptimistic(newCircle);
-    
-    // Note: Don't auto-select during creation (user is in creation mode)
-  }, [user?.id, screenToCanvasCoords, createObjectOptimistic]);
-
-  // Handle text creation with Firestore sync
-  const handleCreateText = useCallback(async (screenX: number, screenY: number) => {
-    if (!user?.id) {
-      return;
-    }
-
-    // Convert screen coordinates to canvas coordinates
-    const { x, y } = screenToCanvasCoords(screenX, screenY);
-
-    // Check if position is within canvas boundaries
-    if (!isWithinCanvasBounds(x, y)) {
-      return;
-    }
-
-    // Create new text object
-    const newText = createNewText(x, y, user.id);
-
-    // Create with optimistic updates and Firestore sync
-    await createObjectOptimistic(newText);
-    
-    // Note: Don't auto-select during creation (user is in creation mode)
-  }, [user?.id, screenToCanvasCoords, createObjectOptimistic]);
 
   // Handle text formatting updates
   const handleTextFormattingUpdate = useCallback((textObjectId: string, updates: Partial<CanvasObject>) => {
@@ -597,119 +428,6 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     
     setEditingTextId(null);
   }, [user?.id, updateObjectOptimistic]);
-
-  // Handle lasso selection start
-  const handleLassoStart = useCallback((screenX: number, screenY: number) => {
-    if (activeTool !== 'lasso') return;
-    
-    // Convert screen coordinates to canvas coordinates
-    const { x, y } = screenToCanvasCoords(screenX, screenY);
-    
-    setLassoState({
-      isDrawing: true,
-      points: [x, y],
-      isClosing: false
-    });
-  }, [activeTool, screenToCanvasCoords]);
-
-  // Handle lasso path drawing (throttled)
-  const handleLassoMove = useCallback((screenX: number, screenY: number) => {
-    if (!lassoState.isDrawing) return;
-    
-    // Convert screen coordinates to canvas coordinates
-    const { x, y } = screenToCanvasCoords(screenX, screenY);
-    
-    // Check if we're close to the starting point (for visual feedback)
-    const isClosing = shouldCloseLasso(lassoState.points, { x, y }, 20 / viewport.scale);
-    
-    // Only add point if it's far enough from the last point (distance-based throttling)
-    const lastX = lassoState.points[lassoState.points.length - 2];
-    const lastY = lassoState.points[lassoState.points.length - 1];
-    const distance = Math.sqrt(Math.pow(x - lastX, 2) + Math.pow(y - lastY, 2));
-    
-    if (distance >= 5 / viewport.scale) { // Scale-aware distance threshold
-      setLassoState(prev => ({
-        ...prev,
-        points: [...prev.points, x, y],
-        isClosing
-      }));
-    } else if (isClosing !== lassoState.isClosing) {
-      // Update closing state even if not adding point
-      setLassoState(prev => ({
-        ...prev,
-        isClosing
-      }));
-    }
-  }, [lassoState.isDrawing, lassoState.points, lassoState.isClosing, screenToCanvasCoords, viewport.scale]);
-
-  // Handle lasso selection complete
-  const handleLassoComplete = useCallback(async (shiftKey: boolean = false, altKey: boolean = false) => {
-    if (!lassoState.isDrawing || lassoState.points.length < 6) {
-      // Need at least 3 points (6 coordinates) to form a valid selection area
-      setLassoState({
-        isDrawing: false,
-        points: [],
-        isClosing: false
-      });
-      return;
-    }
-    
-    // Simplify the path to improve performance
-    const simplifiedPoints = simplifyPath(lassoState.points, 3);
-    
-    // Find all objects whose center point is inside the lasso
-    const objectsInLasso = objects.filter(obj => isObjectInLasso(obj, simplifiedPoints));
-    
-    if (objectsInLasso.length === 0) {
-      toastFunction('No objects in lasso area', 'info', 1500);
-      setLassoState({
-        isDrawing: false,
-        points: [],
-        isClosing: false
-      });
-      return;
-    }
-    
-    const objectIdsInLasso = objectsInLasso.map(obj => obj.id);
-    
-    // Handle modifier keys for add/remove from selection
-    let newSelection: string[];
-    
-    if (shiftKey) {
-      // Shift: Add to current selection
-      newSelection = [...new Set([...selectedObjectIds, ...objectIdsInLasso])];
-    } else if (altKey) {
-      // Alt: Remove from current selection
-      newSelection = selectedObjectIds.filter(id => !objectIdsInLasso.includes(id));
-    } else {
-      // No modifier: Replace selection
-      // Release current locks first
-      await releaseMultipleLocks(selectedObjectIds);
-      newSelection = objectIdsInLasso;
-    }
-    
-    // Acquire locks on the new selection
-    const lockedIds = await acquireMultipleLocks(newSelection);
-    setSelectedObjectIds(lockedIds);
-    
-    // Show feedback
-    if (lockedIds.length > 0) {
-      const totalCount = newSelection.length;
-      if (lockedIds.length === totalCount) {
-        toastFunction(`${lockedIds.length} object${lockedIds.length > 1 ? 's' : ''} selected`, 'success', 1500);
-      } else {
-        const lockedCount = totalCount - lockedIds.length;
-        toastFunction(`Selected ${lockedIds.length} of ${totalCount} objects. ${lockedCount} locked by others`, 'warning', 2000);
-      }
-    }
-    
-    // Clear lasso
-    setLassoState({
-      isDrawing: false,
-      points: [],
-      isClosing: false
-    });
-  }, [lassoState.isDrawing, lassoState.points, objects, selectedObjectIds, acquireMultipleLocks, releaseMultipleLocks, toastFunction]);
 
   // Handle duplicate object(s) (Ctrl/Cmd+D) - Supports multi-select
   const handleDuplicateObject = useCallback(async () => {
@@ -803,276 +521,6 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     toastFunction(`${successCount} of ${count} object${count > 1 ? 's' : ''} deleted`, 'success', 1500);
   }, [selectedObjectIds, deleteObjectOptimistic, releaseMultipleLocks, toastFunction]);
 
-  // Handle clear selection
-  const handleClearSelection = useCallback(async () => {
-    if (selectedObjectIds.length > 0) {
-      await releaseMultipleLocks(selectedObjectIds);
-      setSelectedObjectIds([]);
-    }
-  }, [selectedObjectIds, releaseMultipleLocks]);
-
-  // Handle select all
-  const handleSelectAll = useCallback(async () => {
-    if (!user?.id) return;
-    
-    // Release current locks first
-    await releaseMultipleLocks(selectedObjectIds);
-    
-    // Try to acquire locks on all objects
-    const allObjectIds = objects.map(obj => obj.id);
-    const lockedIds = await acquireMultipleLocks(allObjectIds);
-    
-    setSelectedObjectIds(lockedIds);
-    
-    if (lockedIds.length > 0) {
-      toastFunction(`Selected ${lockedIds.length} of ${allObjectIds.length} objects`, 'success', 1500);
-    }
-  }, [user?.id, objects, selectedObjectIds, acquireMultipleLocks, releaseMultipleLocks, toastFunction]);
-
-  // Handle select next object
-  const handleSelectNext = useCallback(async () => {
-    if (!user?.id || objects.length === 0) return;
-    
-    const currentIndex = selectedObjectIds.length === 1 
-      ? objects.findIndex(obj => obj.id === selectedObjectIds[0])
-      : -1;
-    
-    const nextIndex = (currentIndex + 1) % objects.length;
-    const nextObject = objects[nextIndex];
-    
-    // Release current locks
-    await releaseMultipleLocks(selectedObjectIds);
-    
-    // Try to acquire lock on next object
-    const locked = await acquireMultipleLocks([nextObject.id]);
-    setSelectedObjectIds(locked);
-  }, [user?.id, objects, selectedObjectIds, acquireMultipleLocks, releaseMultipleLocks]);
-
-  // Handle select previous object
-  const handleSelectPrevious = useCallback(async () => {
-    if (!user?.id || objects.length === 0) return;
-    
-    const currentIndex = selectedObjectIds.length === 1 
-      ? objects.findIndex(obj => obj.id === selectedObjectIds[0])
-      : -1;
-    
-    const prevIndex = currentIndex <= 0 ? objects.length - 1 : currentIndex - 1;
-    const prevObject = objects[prevIndex];
-    
-    // Release current locks
-    await releaseMultipleLocks(selectedObjectIds);
-    
-    // Try to acquire lock on previous object
-    const locked = await acquireMultipleLocks([prevObject.id]);
-    setSelectedObjectIds(locked);
-  }, [user?.id, objects, selectedObjectIds, acquireMultipleLocks, releaseMultipleLocks]);
-
-  // Handle select inverse (select all except currently selected)
-  const handleSelectInverse = useCallback(async () => {
-    if (!user?.id) return;
-    
-    // Get all object IDs
-    const allIds = objects.map(obj => obj.id);
-    
-    // Find objects not currently selected
-    const unselectedIds = allIds.filter(id => !selectedObjectIds.includes(id));
-    
-    if (unselectedIds.length === 0) {
-      toastFunction('No objects to select', 'info', 1500);
-      return;
-    }
-    
-    // Release current locks
-    await releaseMultipleLocks(selectedObjectIds);
-    
-    // Try to acquire locks on previously unselected objects
-    const lockedIds = await acquireMultipleLocks(unselectedIds);
-    setSelectedObjectIds(lockedIds);
-    
-    // Show feedback
-    if (lockedIds.length > 0) {
-      const totalCount = unselectedIds.length;
-      if (lockedIds.length === totalCount) {
-        toastFunction(`Selected ${lockedIds.length} object${lockedIds.length > 1 ? 's' : ''}`, 'success', 1500);
-      } else {
-        const lockedCount = totalCount - lockedIds.length;
-        toastFunction(`Selected ${lockedIds.length} of ${totalCount} objects. ${lockedCount} locked by others`, 'warning', 2000);
-      }
-    }
-  }, [user?.id, objects, selectedObjectIds, releaseMultipleLocks, acquireMultipleLocks, toastFunction]);
-
-  // Handle select by type (all rectangles, circles, or text)
-  const handleSelectByType = useCallback(async (objectType: 'rectangle' | 'circle' | 'text', addToSelection: boolean = false) => {
-    if (!user?.id) return;
-    
-    // Find all objects of the specified type
-    const matchingObjects = objects.filter(obj => obj.type === objectType);
-    
-    if (matchingObjects.length === 0) {
-      toastFunction(`No ${objectType}s found`, 'info', 1500);
-      return;
-    }
-    
-    const matchingIds = matchingObjects.map(obj => obj.id);
-    
-    let newSelection: string[];
-    
-    if (addToSelection) {
-      // Add to current selection (merge with existing)
-      newSelection = [...new Set([...selectedObjectIds, ...matchingIds])];
-    } else {
-      // Replace selection
-      await releaseMultipleLocks(selectedObjectIds);
-      newSelection = matchingIds;
-    }
-    
-    // Try to acquire locks
-    const lockedIds = await acquireMultipleLocks(newSelection);
-    setSelectedObjectIds(lockedIds);
-    
-    // Show feedback
-    const typeName = objectType === 'circle' ? 'circle' : objectType;
-    if (lockedIds.length > 0) {
-      const totalCount = newSelection.length;
-      if (lockedIds.length === totalCount) {
-        toastFunction(`Selected ${lockedIds.length} ${typeName}${lockedIds.length > 1 ? 's' : ''}`, 'success', 1500);
-      } else {
-        const lockedCount = totalCount - lockedIds.length;
-        toastFunction(`Selected ${lockedIds.length} of ${totalCount} ${typeName}s. ${lockedCount} locked by others`, 'warning', 2000);
-      }
-    }
-  }, [user?.id, objects, selectedObjectIds, releaseMultipleLocks, acquireMultipleLocks, toastFunction]);
-
-  // Handle select by IDs (for filter panel)
-  const handleSelectByIds = useCallback(async (objectIds: string[]) => {
-    if (!user?.id) return;
-    
-    if (objectIds.length === 0) {
-      toastFunction('No objects to select', 'info', 1500);
-      return;
-    }
-    
-    // Release current locks
-    await releaseMultipleLocks(selectedObjectIds);
-    
-    // Try to acquire locks on the specified objects
-    const lockedIds = await acquireMultipleLocks(objectIds);
-    setSelectedObjectIds(lockedIds);
-    
-    // Show feedback
-    if (lockedIds.length > 0) {
-      const totalCount = objectIds.length;
-      if (lockedIds.length === totalCount) {
-        toastFunction(`Selected ${lockedIds.length} object${lockedIds.length > 1 ? 's' : ''}`, 'success', 1500);
-      } else {
-        const lockedCount = totalCount - lockedIds.length;
-        toastFunction(`Selected ${lockedIds.length} of ${totalCount} objects. ${lockedCount} locked by others`, 'warning', 2000);
-      }
-    }
-  }, [user?.id, selectedObjectIds, acquireMultipleLocks, releaseMultipleLocks, toastFunction]);
-
-  // Handle alignment
-  const handleAlign = useCallback(async (alignmentType: AlignmentType) => {
-    if (!user?.id || selectedObjectIds.length < 2) return;
-
-    // Get selected objects
-    const selectedObjects = objects.filter(obj => selectedObjectIds.includes(obj.id));
-    
-    if (selectedObjects.length < 2) {
-      toastFunction('Select at least 2 objects to align', 'info', 1500);
-      return;
-    }
-
-    // Calculate new positions
-    const updates = alignObjects(selectedObjects, alignmentType);
-
-    // Apply batch update to Firebase (atomic transaction)
-    const success = await batchUpdateObjectsOptimistic(updates);
-    
-    if (!success) {
-      toastFunction('Alignment failed', 'error', 1500);
-      return;
-    }
-
-    // Show feedback
-    const alignmentNames: Record<AlignmentType, string> = {
-      'left': 'left',
-      'center-horizontal': 'center horizontally',
-      'right': 'right',
-      'top': 'top',
-      'center-vertical': 'center vertically',
-      'bottom': 'bottom'
-    };
-    toastFunction(`Aligned ${updates.size} objects ${alignmentNames[alignmentType]}`, 'success', 1500);
-  }, [user?.id, selectedObjectIds, objects, batchUpdateObjectsOptimistic, toastFunction]);
-
-  // Handle distribution
-  const handleDistribute = useCallback(async (distributionType: DistributionType) => {
-    if (!user?.id || selectedObjectIds.length < 3) return;
-
-    // Get selected objects
-    const selectedObjects = objects.filter(obj => selectedObjectIds.includes(obj.id));
-    
-    if (selectedObjects.length < 3) {
-      toastFunction('Select at least 3 objects to distribute', 'info', 1500);
-      return;
-    }
-
-    // Calculate new positions
-    const updates = distributeObjects(selectedObjects, distributionType);
-
-    // Apply batch update to Firebase (atomic transaction)
-    const success = await batchUpdateObjectsOptimistic(updates);
-    
-    if (!success) {
-      toastFunction('Distribution failed', 'error', 1500);
-      return;
-    }
-
-    // Show feedback
-    const distributionNames: Record<DistributionType, string> = {
-      'horizontal-edges': 'horizontally',
-      'horizontal-centers': 'centers horizontally',
-      'vertical-edges': 'vertically',
-      'vertical-centers': 'centers vertically'
-    };
-    toastFunction(`Distributed ${updates.size} objects ${distributionNames[distributionType]}`, 'success', 1500);
-  }, [user?.id, selectedObjectIds, objects, batchUpdateObjectsOptimistic, toastFunction]);
-
-  // Handle align to canvas
-  const handleAlignToCanvas = useCallback(async (alignType: 'center' | 'left' | 'right' | 'top' | 'bottom') => {
-    if (!user?.id || selectedObjectIds.length === 0) return;
-
-    // Get selected objects
-    const selectedObjects = objects.filter(obj => selectedObjectIds.includes(obj.id));
-    
-    if (selectedObjects.length === 0) {
-      toastFunction('Select objects to align to canvas', 'info', 1500);
-      return;
-    }
-
-    // Calculate new positions
-    const updates = alignToCanvas(selectedObjects, CANVAS_WIDTH, CANVAS_HEIGHT, alignType);
-
-    // Apply batch update to Firebase (atomic transaction)
-    const success = await batchUpdateObjectsOptimistic(updates);
-    
-    if (!success) {
-      toastFunction('Canvas alignment failed', 'error', 1500);
-      return;
-    }
-
-    // Show feedback
-    const alignNames: Record<string, string> = {
-      'center': 'to canvas center',
-      'left': 'to canvas left',
-      'right': 'to canvas right',
-      'top': 'to canvas top',
-      'bottom': 'to canvas bottom'
-    };
-    toastFunction(`Aligned ${updates.size} objects ${alignNames[alignType]}`, 'success', 1500);
-  }, [user?.id, selectedObjectIds, objects, batchUpdateObjectsOptimistic, toastFunction]);
-
   // Expose functions to parent via ref
   useImperativeHandle(ref, () => ({
     duplicate: handleDuplicateObject,
@@ -1101,21 +549,10 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     isTextEditing: () => editingTextId !== null,
     hasSelection: () => selectedObjectIds.length > 0,
     getSelectedObjects: () => selectedObjectIds,
-    setZoom: (scale: number) => {
-      setViewport(prev => ({ ...prev, scale: Math.max(0.1, Math.min(5, scale)) }));
-    },
-    zoomIn: () => {
-      setViewport(prev => ({ ...prev, scale: Math.min(5, prev.scale * 1.2) }));
-      toastFunction(`Zoom: ${Math.round(viewport.scale * 1.2 * 100)}%`, 'info', 1000);
-    },
-    zoomOut: () => {
-      setViewport(prev => ({ ...prev, scale: Math.max(0.1, prev.scale / 1.2) }));
-      toastFunction(`Zoom: ${Math.round(viewport.scale / 1.2 * 100)}%`, 'info', 1000);
-    },
-    resetZoom: () => {
-      setViewport(prev => ({ ...prev, scale: 1 }));
-      toastFunction('Zoom reset to 100%', 'success', 1500);
-    },
+    setZoom,
+    zoomIn,
+    zoomOut,
+    resetZoom,
     exportCanvas: async (options: ExportOptions) => {
       const stage = stageRef.current;
       if (!stage) {
@@ -1156,7 +593,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
       
       return generatePreview(params, mode);
     }
-  }), [handleDuplicateObject, handleDeleteSelected, handleClearSelection, handleSelectAll, handleSelectNext, handleSelectPrevious, handleSelectInverse, handleSelectByType, handleSelectByIds, handleAlign, handleDistribute, handleAlignToCanvas, rotateBy, resetRotation, selectedObjectIds, editingTextId, toastFunction, viewport, objects, stageRef]);
+  }), [handleDuplicateObject, handleDeleteSelected, handleClearSelection, handleSelectAll, handleSelectNext, handleSelectPrevious, handleSelectInverse, handleSelectByType, handleSelectByIds, handleAlign, handleDistribute, handleAlignToCanvas, rotateBy, resetRotation, setZoom, zoomIn, zoomOut, resetZoom, selectedObjectIds, editingTextId, toastFunction, viewport, objects, stageRef]);
 
   // Track Space key for pan mode (Space+Drag to pan) and Cmd/Ctrl for snap override
   useEffect(() => {
@@ -1219,184 +656,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     };
   }, [isSpacePressed, editingTextId, lassoState.isDrawing, toastFunction]);
 
-  // Handle rectangle drag events (supports group movement for multi-select)
-  const handleRectangleDragStart = useCallback((objectId: string) => {
-    // Verify the user has the lock before allowing drag
-    const object = objects.find(obj => obj.id === objectId);
-    if (!object || object.lockedBy !== user?.id) {
-      console.warn(`Drag start blocked: User ${user?.id} doesn't own lock on ${objectId}`);
-      return false; // Prevent drag
-    }
-    
-    // Check if this object is part of a multi-selection
-    const isInSelection = selectedObjectIds.includes(objectId);
-    if (isInSelection && selectedObjectIds.length > 1) {
-      // Store initial positions of ALL selected objects for accurate delta calculation
-      const initialPositions = new Map<string, { x: number; y: number }>();
-      selectedObjectIds.forEach(id => {
-        const obj = objects.find(o => o.id === id);
-        if (obj) {
-          initialPositions.set(id, { x: obj.x, y: obj.y });
-        }
-      });
-      groupDragStartPositions.current = initialPositions;
-      console.log(`🎯 Group drag started for ${selectedObjectIds.length} objects`);
-    } else {
-      // Single object drag - clear any stored positions
-      groupDragStartPositions.current.clear();
-      console.log(`🎯 Drag started for object ${objectId} by user ${user.id}`);
-    }
-    
-    return true; // Allow drag
-  }, [objects, user?.id, selectedObjectIds]);
-
-  const handleRectangleDragMove = useCallback((objectId: string, x: number, y: number) => {
-    // Only allow drag moves if user has acquired the lock (safety check)
-    const object = objects.find(obj => obj.id === objectId);
-    if (!object || object.lockedBy !== user?.id) {
-      console.warn(`Drag blocked: User ${user?.id} doesn't own lock on ${objectId}`);
-      return;
-    }
-
-    // Update cursor position during drag so other users can see where you're dragging
-    if (user?.id) {
-      throttledCursorUpdate(x, y);
-    }
-
-    // Check if this is a group drag (multi-select)
-    const isInSelection = selectedObjectIds.includes(objectId);
-    if (isInSelection && selectedObjectIds.length > 1) {
-      // Group movement: Calculate delta from INITIAL position (stored at drag start)
-      const initialPos = groupDragStartPositions.current.get(objectId);
-      if (!initialPos) {
-        console.warn('⚠️ No initial position stored for group drag');
-        return;
-      }
-      
-      const deltaX = x - initialPos.x;
-      const deltaY = y - initialPos.y;
-      
-      console.log(`🔄 Group drag for ${selectedObjectIds.length} objects:`, selectedObjectIds);
-      
-      // Move all selected objects by the same delta (from THEIR initial positions)
-      selectedObjectIds.forEach(selectedId => {
-        const selectedObj = objects.find(obj => obj.id === selectedId);
-        const selectedInitialPos = groupDragStartPositions.current.get(selectedId);
-        
-        if (selectedObj && selectedObj.lockedBy === user?.id && selectedInitialPos) {
-          const newX = selectedInitialPos.x + deltaX;
-          const newY = selectedInitialPos.y + deltaY;
-          
-          // Constrain each object to canvas boundaries
-          const dimensions = getShapeDimensions(selectedObj);
-          const constrainedPosition = constrainToBounds(newX, newY, dimensions.width, dimensions.height);
-          
-          // Use throttled updates for real-time collaboration visibility
-          // The batch update at drag end will cancel any pending throttled updates
-          updateObjectOptimistic(selectedId, {
-            x: constrainedPosition.x,
-            y: constrainedPosition.y,
-            modifiedBy: user.id
-          });
-        }
-      });
-      
-      // Clear snap guides for group drag (too complex to show)
-      setSnapGuides([]);
-    } else {
-      // Single object movement - apply snapping
-      const dimensions = getShapeDimensions(object);
-      
-      // Apply snapping (grid and/or smart guides)
-      const snapResult = applySnapping(
-        x,
-        y,
-        dimensions.width,
-        dimensions.height,
-        objects,
-        objectId,
-        snapSettings,
-        isModifierPressed
-      );
-      
-      // Update snap guides
-      setSnapGuides(snapResult.guides);
-      
-      // Use snapped position
-      const constrainedPosition = constrainToBounds(
-        snapResult.x,
-        snapResult.y,
-        dimensions.width,
-        dimensions.height
-      );
-
-      updateObjectOptimistic(objectId, {
-        x: constrainedPosition.x,
-        y: constrainedPosition.y,
-        modifiedBy: user.id
-      });
-    }
-  }, [user?.id, updateObjectOptimistic, objects, selectedObjectIds, snapSettings, isModifierPressed, setSnapGuides, groupDragStartPositions, viewport, throttledCursorUpdate]);
-
-  const handleRectangleDragEnd = useCallback(async (objectId: string, x: number, y: number) => {
-    // Verify the user still has the lock 
-    const object = objects.find(obj => obj.id === objectId);
-    if (!object || object.lockedBy !== user?.id) {
-      console.warn(`Drag end blocked: User ${user?.id} doesn't own lock on ${objectId}`);
-      return;
-    }
-
-    // Check if this was a group drag
-    const wasGroupDrag = groupDragStartPositions.current.size > 1;
-    
-    if (wasGroupDrag) {
-      // For group drag, collect all final positions and batch update
-      console.log(`🏁 Group drag ended for ${selectedObjectIds.length} objects - sending batch update`);
-      
-      const batchUpdates = new Map<string, CanvasObjectUpdate>();
-      
-      // Collect all final positions from current object state
-      selectedObjectIds.forEach(selectedId => {
-        const selectedObj = objects.find(obj => obj.id === selectedId);
-        if (selectedObj && selectedObj.lockedBy === user?.id) {
-          batchUpdates.set(selectedId, {
-            x: selectedObj.x,
-            y: selectedObj.y,
-            modifiedBy: user.id
-          });
-        }
-      });
-      
-      // Send batch update to Firebase
-      if (batchUpdates.size > 0) {
-        await batchUpdateObjectsOptimistic(batchUpdates);
-      }
-    } else {
-      // Single object drag - send final position update
-      const dimensions = getShapeDimensions(object);
-      const constrainedPosition = constrainToBounds(x, y, dimensions.width, dimensions.height);
-      
-      console.log(`🏁 Drag ended for object ${objectId} at position (${constrainedPosition.x}, ${constrainedPosition.y})`);
-
-      // Send final position update to Firestore (this will override any pending throttled updates)
-      await updateObjectOptimistic(objectId, {
-        x: constrainedPosition.x,
-        y: constrainedPosition.y,
-        modifiedBy: user.id
-      });
-    }
-
-    // Clear stored initial positions (for group drag)
-    groupDragStartPositions.current.clear();
-    
-    // Clear snap guides
-    setSnapGuides([]);
-
-    // Keep lock active - user still has the object(s) selected for further editing
-    console.log(`🔒 Lock maintained after drag completion`);
-  }, [objects, user?.id, updateObjectOptimistic, batchUpdateObjectsOptimistic, selectedObjectIds]);
-
-      // Handle mouse down for panning and tool interactions
+  // Handle mouse down for panning and tool interactions
       const handleMouseDown = useCallback(async (e: Konva.KonvaEventObject<MouseEvent>) => {
         const stage = e.target.getStage();
         if (!stage) return;
@@ -1489,33 +749,6 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
       handleLassoComplete(shiftKey, altKey);
     }
   }, [lassoState.isDrawing, handleLassoComplete]);
-
-  // Handle wheel for zooming
-  const handleWheel = useCallback((e: Konva.KonvaEventObject<WheelEvent>) => {
-    e.evt.preventDefault();
-
-    const stage = stageRef.current;
-    if (!stage) return;
-
-    const pointer = stage.getPointerPosition();
-    if (!pointer) return;
-
-    // Zoom factor
-    const scaleBy = 1.05;
-    const oldScale = viewport.scale;
-    
-    // Calculate new scale
-    const newScale = e.evt.deltaY > 0 ? oldScale / scaleBy : oldScale * scaleBy;
-    
-    // Zoom toward cursor position
-    const newViewport = constrainViewport({
-      scale: newScale,
-      x: pointer.x - ((pointer.x - viewport.x) / oldScale) * newScale,
-      y: pointer.y - ((pointer.y - viewport.y) / oldScale) * newScale,
-    });
-
-    setViewport(newViewport);
-  }, [viewport, constrainViewport]);
 
   // Show loading state
   if (isLoading) {
