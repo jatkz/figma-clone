@@ -211,13 +211,15 @@ export function useCanvasDrag({
         dimensions.height
       );
 
-      updateObjectOptimistic(objectId, {
+      // Update local state only (no Firestore sync during drag)
+      // Final position will be sent at drag end
+      updateObjectLocal(objectId, {
         x: constrainedPosition.x,
         y: constrainedPosition.y,
         modifiedBy: user.id
       });
     }
-  }, [user?.id, updateObjectOptimistic, objects, selectedObjectIds, snapSettings, isModifierPressed, setSnapGuides, throttledCursorUpdate]);
+  }, [user?.id, updateObjectLocal, objects, selectedObjectIds, snapSettings, isModifierPressed, setSnapGuides, throttledCursorUpdate]);
 
   const handleRectangleDragEnd = useCallback(async (objectId: string, x: number, y: number) => {
     // Verify the user still has the lock 
@@ -257,7 +259,7 @@ export function useCanvasDrag({
       const dimensions = getShapeDimensions(object);
       const constrainedPosition = constrainToBounds(x, y, dimensions.width, dimensions.height);
 
-      // Send final position update to Firestore (this will override any pending throttled updates)
+      // Send final position update to Firestore immediately
       await updateObjectOptimistic(objectId, {
         x: constrainedPosition.x,
         y: constrainedPosition.y,
