@@ -39,6 +39,8 @@ const shortcuts: Shortcut[] = [
   { keys: ['Ctrl', '-'], description: 'Zoom out', category: 'Canvas' },
   { keys: ['Space', 'Drag'], description: 'Pan canvas', category: 'Canvas' },
   { keys: ['Ctrl', 'Shift', 'E'], description: 'Export canvas (PNG/SVG)', category: 'Canvas' },
+  { keys: ['Ctrl', "'"], description: 'Toggle Snap to Grid', category: 'Canvas' },
+  { keys: ['Hold Ctrl'], description: 'Temporarily disable snapping (grid & guides)', category: 'Canvas' },
   
   // General
   { keys: ['?'], description: 'Show keyboard shortcuts', category: 'General' },

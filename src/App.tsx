@@ -10,6 +10,7 @@ import ShortcutsPanel from './components/ShortcutsPanel';
 import ExportDialog from './components/ExportDialog';
 import type { ExportOptions } from './utils/canvasExport';
 import { ToastProvider, useToastContext } from './contexts/ToastContext';
+import { SnapProvider, useSnap } from './contexts/SnapContext';
 import { ToastManager } from './components/Toast';
 import { useCanvas } from './hooks/useCanvas';
 import { useAuth } from './hooks/useAuth';
@@ -30,6 +31,7 @@ function AppContent() {
   const canvasRef = useRef<CanvasRef>(null);
   const [hasSelection, setHasSelection] = useState(false);
   const [clipboard, setClipboard] = useState<string[]>([]); // Store copied object IDs
+  const { settings: snapSettings, toggleGrid } = useSnap();
 
   // Consolidated keyboard shortcuts handler
   useEffect(() => {
@@ -205,6 +207,18 @@ function AppContent() {
         return;
       }
 
+      // Toggle Snap to Grid: Cmd/Ctrl+'
+      if ((e.ctrlKey || e.metaKey) && e.key === "'") {
+        e.preventDefault();
+        toggleGrid();
+        toastFunction(
+          `Snap to Grid ${!snapSettings.gridEnabled ? 'enabled' : 'disabled'}`,
+          'info',
+          1500
+        );
+        return;
+      }
+
       // Escape: Clear selection and switch to select tool
       if (e.key === 'Escape') {
         await canvasRef.current?.clearSelection();
@@ -215,7 +229,7 @@ function AppContent() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [setActiveTool, clipboard, toastFunction]);
+  }, [setActiveTool, clipboard, toastFunction, snapSettings, toggleGrid]);
 
   // Handle canvas export
   const handleExport = async (options: ExportOptions) => {
@@ -435,7 +449,9 @@ function AppContent() {
 function App() {
   return (
     <ToastProvider>
-      <AppContent />
+      <SnapProvider>
+        <AppContent />
+      </SnapProvider>
     </ToastProvider>
   );
 }

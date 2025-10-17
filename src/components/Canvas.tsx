@@ -27,6 +27,10 @@ import { useToastContext, createToastFunction } from '../contexts/ToastContext';
 import { updateCursor, subscribeToCursors, type CursorData } from '../services/canvasService';
 import { initializeAICanvasState, cleanupAICanvasState } from '../services/aiCanvasService';
 import { exportToSVG, exportToPNG, generatePreview, type ExportOptions } from '../utils/canvasExport';
+import { applySnapping } from '../utils/snapUtils';
+import { useSnap } from '../contexts/SnapContext';
+import type { SnapGuide } from '../types/snap';
+import SnapGuides from './SnapGuides';
 import Cursor from './Cursor';
 
 // Throttle utility for cursor updates
@@ -92,6 +96,13 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     createToastFunction(toastContext),
     [toastContext]
   );
+
+  // Snap settings from context
+  const { settings: snapSettings } = useSnap();
+  
+  // Snap guides state
+  const [snapGuides, setSnapGuides] = useState<SnapGuide[]>([]);
+  const [isModifierPressed, setIsModifierPressed] = useState(false);
 
   // Real-time canvas state from Firestore
   const {
@@ -714,9 +725,14 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     }
   }), [handleDuplicateObject, handleDeleteSelected, handleClearSelection, handleSelectAll, handleSelectNext, handleSelectPrevious, rotateBy, resetRotation, selectedObjectIds, editingTextId, toastFunction, viewport, objects, stageRef]);
 
-  // Track Space key for pan mode (Space+Drag to pan)
+  // Track Space key for pan mode (Space+Drag to pan) and Cmd/Ctrl for snap override
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Track Cmd/Ctrl for snap override
+      if (e.ctrlKey || e.metaKey) {
+        setIsModifierPressed(true);
+      }
+      
       if (e.code === 'Space' && !isSpacePressed) {
         // Don't activate if typing in input fields
         const target = e.target as HTMLElement;
@@ -739,6 +755,11 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
+      // Track Cmd/Ctrl release
+      if (!e.ctrlKey && !e.metaKey) {
+        setIsModifierPressed(false);
+      }
+      
       if (e.code === 'Space') {
         setIsSpacePressed(false);
         setIsPanning(false); // Stop panning when space is released
@@ -834,10 +855,35 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
           console.log(`    ❌ Skipped ${selectedId}`);
         }
       });
+      
+      // Clear snap guides for group drag (too complex to show)
+      setSnapGuides([]);
     } else {
-      // Single object movement
+      // Single object movement - apply snapping
       const dimensions = getShapeDimensions(object);
-      const constrainedPosition = constrainToBounds(x, y, dimensions.width, dimensions.height);
+      
+      // Apply snapping (grid and/or smart guides)
+      const snapResult = applySnapping(
+        x,
+        y,
+        dimensions.width,
+        dimensions.height,
+        objects,
+        objectId,
+        snapSettings,
+        isModifierPressed
+      );
+      
+      // Update snap guides
+      setSnapGuides(snapResult.guides);
+      
+      // Use snapped position
+      const constrainedPosition = constrainToBounds(
+        snapResult.x,
+        snapResult.y,
+        dimensions.width,
+        dimensions.height
+      );
 
       updateObjectOptimistic(objectId, {
         x: constrainedPosition.x,
@@ -845,7 +891,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
         modifiedBy: user.id
       });
     }
-  }, [user?.id, updateObjectOptimistic, objects, selectedObjectIds]);
+  }, [user?.id, updateObjectOptimistic, objects, selectedObjectIds, snapSettings, isModifierPressed]);
 
   const handleRectangleDragEnd = useCallback(async (objectId: string, x: number, y: number) => {
     // Verify the user still has the lock 
@@ -879,6 +925,9 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
 
     // Clear stored initial positions (for group drag)
     groupDragStartPositions.current.clear();
+    
+    // Clear snap guides
+    setSnapGuides([]);
 
     // Keep lock active - user still has the object(s) selected for further editing
     console.log(`🔒 Lock maintained after drag completion`);
@@ -1244,6 +1293,9 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
               cursorData={cursorData}
             />
           ))}
+          
+          {/* Snap guides (smart alignment guides) */}
+          <SnapGuides guides={snapGuides} scale={viewport.scale} />
         </Layer>
       </Stage>
     </div>
