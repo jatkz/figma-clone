@@ -136,7 +136,7 @@ A **high-performance** real-time collaborative canvas application built with Rea
 - **react-konva 18.2** - React wrapper for Konva
 
 ### Backend & Authentication
-- **Firebase 11.1** - Real-time database and hosting
+- **Firebase Firestore 11.1** - NoSQL database with real-time synchronization
 - **Auth0** - User authentication and authorization
 
 ### AI Integration
@@ -169,8 +169,7 @@ A **high-performance** real-time collaborative canvas application built with Rea
 ┌─────────────────────────────────────────────────┐
 │              Real-time Backend                   │
 ├─────────────────────────────────────────────────┤
-│  Firebase Firestore (Database)                  │
-│  Firebase Realtime (Live Updates)               │
+│  Firebase Firestore (Database + Live Updates)   │
 │  Auth0 (Authentication)                         │
 └─────────────────────────────────────────────────┘
                       ↕
@@ -337,12 +336,22 @@ Sub-Components Extracted:
 
 ### Real-time Synchronization
 
-The application uses Firebase Firestore for real-time data synchronization:
+The application uses **Firebase Firestore** for all real-time data synchronization:
 
-1. **Optimistic Updates** - UI updates immediately, then syncs with server
-2. **Conflict Resolution** - Last-write-wins with version tracking
-3. **Object Locking** - Users acquire locks on objects they're editing
-4. **Cursor Tracking** - Live cursor positions for all connected users
+#### **How It Works:**
+1. **Optimistic Updates** - UI updates immediately, then syncs with Firestore
+2. **Live Listeners** - `onSnapshot` listeners provide instant updates across all clients
+3. **Conflict Resolution** - Last-write-wins with version tracking via transactions
+4. **Object Locking** - Users acquire locks on objects they're editing (stored in Firestore)
+5. **Cursor Tracking** - Live cursor positions synchronized in real-time (Firestore collection)
+
+#### **Technical Details:**
+- **Collections Used:**
+  - `canvas/global/objects` - Canvas objects (rectangles, circles, text)
+  - `canvas/global/cursors` - User cursor positions
+- **Real-time Method:** Firestore `onSnapshot()` listeners
+- **Update Strategy:** Optimistic UI updates + throttled Firestore writes (300ms)
+- **Batch Operations:** Atomic transactions for multi-object updates
 
 ### Canvas State Management
 
@@ -517,12 +526,17 @@ Open AI chat (button in top-right) and try:
 
 ## 📝 Configuration Files
 
-### Firebase Setup
+### Firebase Firestore Setup
 
 1. Create a Firebase project at [Firebase Console](https://console.firebase.google.com/)
-2. Enable Firestore Database
-3. Set up Firestore rules (see `firestore.rules`)
-4. Copy configuration to `.env`
+2. **Enable Firestore Database** (not Realtime Database)
+   - Navigate to Firestore Database in the console
+   - Click "Create database"
+   - Choose production mode or test mode
+3. Set up Firestore security rules (see `firestore.rules`)
+4. Copy Firebase configuration to `.env`
+
+**Note:** This project uses **Firestore** (document database with real-time features), not Firebase Realtime Database (JSON tree database). Make sure to enable Firestore in your Firebase console.
 
 ### Auth0 Setup
 
@@ -608,7 +622,7 @@ This project is open source and available under the MIT License.
 ## 🙏 Acknowledgments
 
 - **Konva.js** - Powerful HTML5 canvas library
-- **Firebase** - Real-time database and hosting
+- **Firebase Firestore** - Real-time NoSQL database with live synchronization
 - **Auth0** - Authentication platform
 - **OpenAI** - AI-powered features
 - **Figma** - Design inspiration
