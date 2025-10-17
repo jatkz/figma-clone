@@ -252,6 +252,66 @@ export const updateObject = async (
 };
 
 /**
+ * Batch update multiple objects in a single atomic transaction
+ * @param updates Map of objectId to updates
+ * @returns Promise that resolves to array of updated objects
+ */
+export const batchUpdateObjects = async (
+  updates: Map<string, CanvasObjectUpdate>
+): Promise<CanvasObject[]> => {
+  try {
+    console.log('Batch updating objects in Firestore:', Array.from(updates.keys()));
+    
+    const updatedObjects = await runTransaction(db, async (transaction) => {
+      const results: CanvasObject[] = [];
+      
+      // First, read all objects
+      const objectPromises = Array.from(updates.keys()).map(async (objectId) => {
+        const objectDocRef = doc(db, OBJECTS_COLLECTION_PATH, objectId);
+        const objectDoc = await transaction.get(objectDocRef);
+        
+        if (!objectDoc.exists()) {
+          throw new Error(`Object with ID ${objectId} not found`);
+        }
+        
+        return { objectId, objectDocRef, data: objectDoc.data() as CanvasObject };
+      });
+      
+      const objectsData = await Promise.all(objectPromises);
+      
+      // Then, update all objects
+      objectsData.forEach(({ objectId, objectDocRef, data }) => {
+        const currentVersion = data.version || 1;
+        const objectUpdates = updates.get(objectId)!;
+        
+        const updateData = {
+          ...objectUpdates,
+          version: currentVersion + 1,
+          modifiedAt: serverTimestamp()
+        };
+        
+        transaction.update(objectDocRef, updateData);
+        
+        // Collect updated object for return
+        results.push({
+          ...data,
+          ...objectUpdates,
+          version: currentVersion + 1
+        });
+      });
+      
+      return results;
+    });
+    
+    console.log('Batch update completed successfully for', updatedObjects.length, 'objects');
+    return updatedObjects;
+  } catch (error) {
+    console.error('Error in batch update:', error);
+    throw new Error('Failed to batch update objects');
+  }
+};
+
+/**
  * Delete a canvas object from Firestore
  * @param objectId ID of the object to delete
  * @returns Promise that resolves when deletion is complete

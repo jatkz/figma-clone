@@ -136,6 +136,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     isConnected,
     createObjectOptimistic,
     updateObjectOptimistic,
+    batchUpdateObjectsOptimistic,
     deleteObjectOptimistic,
     acquireObjectLock,
     releaseObjectLock
@@ -962,12 +963,13 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     // Calculate new positions
     const updates = alignObjects(selectedObjects, alignmentType);
 
-    // Apply updates to Firebase
-    await Promise.all(
-      Array.from(updates.entries()).map(([objectId, newPos]) =>
-        updateObjectOptimistic(objectId, newPos)
-      )
-    );
+    // Apply batch update to Firebase (atomic transaction)
+    const success = await batchUpdateObjectsOptimistic(updates);
+    
+    if (!success) {
+      toastFunction('Alignment failed', 'error', 1500);
+      return;
+    }
 
     // Show feedback
     const alignmentNames: Record<AlignmentType, string> = {
@@ -979,7 +981,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
       'bottom': 'bottom'
     };
     toastFunction(`Aligned ${updates.size} objects ${alignmentNames[alignmentType]}`, 'success', 1500);
-  }, [user?.id, selectedObjectIds, objects, updateObjectOptimistic, toastFunction]);
+  }, [user?.id, selectedObjectIds, objects, batchUpdateObjectsOptimistic, toastFunction]);
 
   // Handle distribution
   const handleDistribute = useCallback(async (distributionType: DistributionType) => {
@@ -996,12 +998,13 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     // Calculate new positions
     const updates = distributeObjects(selectedObjects, distributionType);
 
-    // Apply updates to Firebase
-    await Promise.all(
-      Array.from(updates.entries()).map(([objectId, newPos]) =>
-        updateObjectOptimistic(objectId, newPos)
-      )
-    );
+    // Apply batch update to Firebase (atomic transaction)
+    const success = await batchUpdateObjectsOptimistic(updates);
+    
+    if (!success) {
+      toastFunction('Distribution failed', 'error', 1500);
+      return;
+    }
 
     // Show feedback
     const distributionNames: Record<DistributionType, string> = {
@@ -1011,7 +1014,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
       'vertical-centers': 'centers vertically'
     };
     toastFunction(`Distributed ${updates.size} objects ${distributionNames[distributionType]}`, 'success', 1500);
-  }, [user?.id, selectedObjectIds, objects, updateObjectOptimistic, toastFunction]);
+  }, [user?.id, selectedObjectIds, objects, batchUpdateObjectsOptimistic, toastFunction]);
 
   // Handle align to canvas
   const handleAlignToCanvas = useCallback(async (alignType: 'center' | 'left' | 'right' | 'top' | 'bottom') => {
@@ -1028,12 +1031,13 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     // Calculate new positions
     const updates = alignToCanvas(selectedObjects, CANVAS_WIDTH, CANVAS_HEIGHT, alignType);
 
-    // Apply updates to Firebase
-    await Promise.all(
-      Array.from(updates.entries()).map(([objectId, newPos]) =>
-        updateObjectOptimistic(objectId, newPos)
-      )
-    );
+    // Apply batch update to Firebase (atomic transaction)
+    const success = await batchUpdateObjectsOptimistic(updates);
+    
+    if (!success) {
+      toastFunction('Canvas alignment failed', 'error', 1500);
+      return;
+    }
 
     // Show feedback
     const alignNames: Record<string, string> = {
@@ -1044,7 +1048,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
       'bottom': 'to canvas bottom'
     };
     toastFunction(`Aligned ${updates.size} objects ${alignNames[alignType]}`, 'success', 1500);
-  }, [user?.id, selectedObjectIds, objects, updateObjectOptimistic, toastFunction]);
+  }, [user?.id, selectedObjectIds, objects, batchUpdateObjectsOptimistic, toastFunction]);
 
   // Expose functions to parent via ref
   useImperativeHandle(ref, () => ({

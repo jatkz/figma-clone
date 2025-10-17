@@ -4,6 +4,7 @@ import {
   subscribeToObjects,
   createObject,
   updateObject,
+  batchUpdateObjects,
   deleteObject,
   deleteAllObjects,
   acquireLock,
@@ -24,6 +25,7 @@ interface UseCanvasState {
 interface UseCanvasActions {
   createObjectOptimistic: (objectData: CanvasObjectInput) => Promise<CanvasObject | null>;
   updateObjectOptimistic: (objectId: string, updates: CanvasObjectUpdate) => Promise<CanvasObject | null>;
+  batchUpdateObjectsOptimistic: (updates: Map<string, CanvasObjectUpdate>) => Promise<boolean>;
   deleteObjectOptimistic: (objectId: string) => Promise<boolean>;
   deleteAllObjectsOptimistic: () => Promise<boolean>;
   initializeCanvasIfNeeded: () => Promise<void>;
@@ -283,6 +285,46 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
     }
   }, [objects, throttledObjectUpdate]);
 
+  // Batch optimistic update for multiple objects (used for alignment, distribution, multi-drag)
+  const batchUpdateObjectsOptimistic = useCallback(async (
+    updates: Map<string, CanvasObjectUpdate>
+  ): Promise<boolean> => {
+    try {
+      // 1. Update all objects locally immediately (optimistic)
+      const updatedObjectsMap = new Map<string, CanvasObject>();
+      updates.forEach((update, objectId) => {
+        const currentObject = objects.find(obj => obj.id === objectId);
+        if (currentObject) {
+          updatedObjectsMap.set(objectId, {
+            ...currentObject,
+            ...update,
+            version: currentObject.version + 1
+          });
+        }
+      });
+
+      setObjects(prev => 
+        prev.map(obj => updatedObjectsMap.has(obj.id) ? updatedObjectsMap.get(obj.id)! : obj)
+      );
+
+      // 2. Send batch update to Firestore immediately (no throttling for batch operations)
+      console.log('📤 Sending batch update to Firestore for', updates.size, 'objects...');
+      await batchUpdateObjects(updates);
+      
+      console.log('✅ Batch update completed successfully');
+      return true;
+
+    } catch (error) {
+      console.error('❌ Batch update failed:', error);
+      
+      // Rollback to last known good state
+      setObjects([...lastKnownGoodStateRef.current]);
+      toast('Batch update failed, changes reverted', 'error');
+      
+      return false;
+    }
+  }, [objects, toast]);
+
   // Optimistic object deletion
   const deleteObjectOptimistic = useCallback(async (objectId: string): Promise<boolean> => {
     try {
@@ -412,6 +454,7 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
     // Actions
     createObjectOptimistic,
     updateObjectOptimistic,
+    batchUpdateObjectsOptimistic,
     deleteObjectOptimistic,
     deleteAllObjectsOptimistic,
     initializeCanvasIfNeeded,
