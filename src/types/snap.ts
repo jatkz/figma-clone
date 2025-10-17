@@ -1,5 +1,3 @@
-import type { CanvasObject } from './canvas';
-
 export interface SnapSettings {
   gridEnabled: boolean;
   gridSize: number;
