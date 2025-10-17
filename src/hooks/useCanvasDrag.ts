@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 import type { CanvasObject } from '../types/canvas';
 import type { CanvasObjectUpdate } from '../services/canvasService';
 import type { SnapGuide, SnapSettings } from '../types/snap';
@@ -6,11 +6,42 @@ import { getShapeDimensions } from '../utils/shapeUtils';
 import { constrainToBounds } from '../utils/constrainToBounds';
 import { applySnapping } from '../utils/snapUtils';
 
+// Throttle utility for batch updates
+const throttle = <T extends (...args: any[]) => void>(func: T, delay: number) => {
+  let timeoutId: number | null = null;
+  let lastArgs: Parameters<T> | null = null;
+
+  const throttled = ((...args: Parameters<T>) => {
+    lastArgs = args;
+    
+    if (timeoutId === null) {
+      timeoutId = window.setTimeout(() => {
+        if (lastArgs) {
+          func(...lastArgs);
+        }
+        timeoutId = null;
+        lastArgs = null;
+      }, delay);
+    }
+  }) as T & { cancel: () => void };
+
+  throttled.cancel = () => {
+    if (timeoutId !== null) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+      lastArgs = null;
+    }
+  };
+
+  return throttled;
+};
+
 interface UseCanvasDragParams {
   objects: CanvasObject[];
   selectedObjectIds: string[];
   user: { id: string } | null;
   updateObjectOptimistic: (objectId: string, updates: CanvasObjectUpdate) => Promise<CanvasObject | null>;
+  updateObjectLocal: (objectId: string, updates: CanvasObjectUpdate) => CanvasObject | null;
   batchUpdateObjectsOptimistic: (updates: Map<string, CanvasObjectUpdate>) => Promise<boolean>;
   throttledCursorUpdate: (x: number, y: number) => void;
   snapSettings: SnapSettings;
@@ -33,6 +64,7 @@ export function useCanvasDrag({
   selectedObjectIds,
   user,
   updateObjectOptimistic,
+  updateObjectLocal,
   batchUpdateObjectsOptimistic,
   throttledCursorUpdate,
   snapSettings,
@@ -42,6 +74,24 @@ export function useCanvasDrag({
   
   // Store initial positions for group drag (to calculate accurate deltas)
   const groupDragStartPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
+  
+  // Throttled batch update function for group drag
+  const throttledBatchUpdateRef = useRef<(((updates: Map<string, CanvasObjectUpdate>) => void) & { cancel: () => void }) | undefined>(undefined);
+  
+  // Create throttled batch update function
+  if (!throttledBatchUpdateRef.current) {
+    throttledBatchUpdateRef.current = throttle((updates: Map<string, CanvasObjectUpdate>) => {
+      // Send batch update to Firestore (throttled to 300ms)
+      batchUpdateObjectsOptimistic(updates);
+    }, 300);
+  }
+  
+  // Cleanup throttled function on unmount
+  useEffect(() => {
+    return () => {
+      throttledBatchUpdateRef.current?.cancel();
+    };
+  }, []);
 
   // Handle rectangle drag events (supports group movement for multi-select)
   const handleRectangleDragStart = useCallback((objectId: string) => {
@@ -95,6 +145,9 @@ export function useCanvasDrag({
       const deltaX = x - initialPos.x;
       const deltaY = y - initialPos.y;
       
+      // Collect batch updates for all selected objects
+      const batchUpdates = new Map<string, CanvasObjectUpdate>();
+      
       // Move all selected objects by the same delta (from THEIR initial positions)
       selectedObjectIds.forEach(selectedId => {
         const selectedObj = objects.find(obj => obj.id === selectedId);
@@ -108,15 +161,26 @@ export function useCanvasDrag({
           const dimensions = getShapeDimensions(selectedObj);
           const constrainedPosition = constrainToBounds(newX, newY, dimensions.width, dimensions.height);
           
-          // Use throttled updates for real-time collaboration visibility
-          // The batch update at drag end will cancel any pending throttled updates
-          updateObjectOptimistic(selectedId, {
+          // Update local state immediately (no Firestore sync to avoid N individual throttled updates)
+          updateObjectLocal(selectedId, {
+            x: constrainedPosition.x,
+            y: constrainedPosition.y,
+            modifiedBy: user.id
+          });
+          
+          // Collect update for batch Firestore write
+          batchUpdates.set(selectedId, {
             x: constrainedPosition.x,
             y: constrainedPosition.y,
             modifiedBy: user.id
           });
         }
       });
+      
+      // Send single throttled batch update to Firestore (replaces N individual throttled updates)
+      if (batchUpdates.size > 0 && throttledBatchUpdateRef.current) {
+        throttledBatchUpdateRef.current(batchUpdates);
+      }
       
       // Clear snap guides for group drag (too complex to show)
       setSnapGuides([]);
@@ -166,6 +230,9 @@ export function useCanvasDrag({
     const wasGroupDrag = groupDragStartPositions.current.size > 1;
     
     if (wasGroupDrag) {
+      // Cancel any pending throttled batch update (we'll send final state immediately)
+      throttledBatchUpdateRef.current?.cancel();
+      
       // For group drag, collect all final positions and batch update
       const batchUpdates = new Map<string, CanvasObjectUpdate>();
       
@@ -181,7 +248,7 @@ export function useCanvasDrag({
         }
       });
       
-      // Send batch update to Firebase
+      // Send final batch update to Firestore immediately
       if (batchUpdates.size > 0) {
         await batchUpdateObjectsOptimistic(batchUpdates);
       }

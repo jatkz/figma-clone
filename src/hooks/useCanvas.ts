@@ -25,6 +25,7 @@ interface UseCanvasState {
 interface UseCanvasActions {
   createObjectOptimistic: (objectData: CanvasObjectInput) => Promise<CanvasObject | null>;
   updateObjectOptimistic: (objectId: string, updates: CanvasObjectUpdate) => Promise<CanvasObject | null>;
+  updateObjectLocal: (objectId: string, updates: CanvasObjectUpdate) => CanvasObject | null;
   batchUpdateObjectsOptimistic: (updates: Map<string, CanvasObjectUpdate>) => Promise<boolean>;
   deleteObjectOptimistic: (objectId: string) => Promise<boolean>;
   deleteAllObjectsOptimistic: () => Promise<boolean>;
@@ -304,7 +305,34 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
     }
   }, []);
 
-  // Optimistic object update
+  // Local-only object update (no Firestore sync)
+  // Used during multi-select drag to avoid creating individual throttled updates
+  const updateObjectLocal = useCallback((
+    objectId: string, 
+    updates: CanvasObjectUpdate
+  ): CanvasObject | null => {
+    const currentObject = objects.find(obj => obj.id === objectId);
+    if (!currentObject) {
+      return null;
+    }
+
+    // Update locally immediately (no Firestore sync)
+    const updatedObject: CanvasObject = {
+      ...currentObject,
+      ...updates,
+      version: currentObject.version + 1
+    };
+
+    setObjects(prev => 
+      prev.map(obj => 
+        obj.id === objectId ? updatedObject : obj
+      )
+    );
+
+    return updatedObject;
+  }, [objects]);
+
+  // Optimistic object update (with Firestore sync)
   const updateObjectOptimistic = useCallback(async (
     objectId: string, 
     updates: CanvasObjectUpdate
@@ -501,6 +529,7 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
     // Actions
     createObjectOptimistic,
     updateObjectOptimistic,
+    updateObjectLocal,
     batchUpdateObjectsOptimistic,
     deleteObjectOptimistic,
     deleteAllObjectsOptimistic,
