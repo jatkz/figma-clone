@@ -14,10 +14,10 @@ import {
   releaseObjectLock as releaseLock,
   releaseExpiredLocks,
 } from '../services/canvasRTDBService';
-import type { CanvasObject } from '../types/canvas';
+import type { CanvasObject, RectangleObject, CircleObject, TextObject } from '../types/canvas';
 
 // Type definitions for canvas operations
-type CanvasObjectInput = Omit<CanvasObject, 'id'>;
+type CanvasObjectInput = Omit<RectangleObject, 'id'> | Omit<CircleObject, 'id'> | Omit<TextObject, 'id'>;
 
 type CanvasObjectUpdate = Partial<{
   x: number;

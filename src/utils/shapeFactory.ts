@@ -12,9 +12,8 @@ export const generateTempId = (): string => {
 /**
  * Create a new rectangle object
  */
-export const createNewRectangle = (x: number, y: number, userId: string): RectangleObject => {
+export const createNewRectangle = (x: number, y: number, userId: string): Omit<RectangleObject, 'id'> => {
   return {
-    id: generateTempId(),
     type: 'rectangle',
     x: Math.max(0, Math.min(4900, x)),
     y: Math.max(0, Math.min(4900, y)),
@@ -34,9 +33,8 @@ export const createNewRectangle = (x: number, y: number, userId: string): Rectan
  * Create a new circle object
  * Note: x, y represent the CENTER of the circle
  */
-export const createNewCircle = (x: number, y: number, userId: string, radius = 50): CircleObject => {
+export const createNewCircle = (x: number, y: number, userId: string, radius = 50): Omit<CircleObject, 'id'> => {
   return {
-    id: generateTempId(),
     type: 'circle',
     // Circle x,y is center position - constrain so circle stays within canvas
     x: Math.max(radius, Math.min(5000 - radius, x)),
