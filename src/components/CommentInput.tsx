@@ -8,7 +8,8 @@
  * - Character counter
  */
 
-import { useState, KeyboardEvent, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import type { KeyboardEvent } from 'react';
 import { parseMentions } from '../services/commentService';
 
 interface CommentInputProps {
