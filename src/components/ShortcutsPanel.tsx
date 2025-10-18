@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 interface Shortcut {
   keys: string[];
   description: string;
-  category: 'Tools' | 'Selection' | 'Editing' | 'Alignment' | 'Transform' | 'Canvas' | 'General';
+  category: 'Tools' | 'Selection' | 'Editing' | 'Alignment' | 'Transform' | 'Canvas' | 'Collaboration' | 'General';
 }
 
 const shortcuts: Shortcut[] = [
@@ -54,6 +54,9 @@ const shortcuts: Shortcut[] = [
   { keys: ['Ctrl', 'Shift', 'E'], description: 'Export canvas (PNG/SVG)', category: 'Canvas' },
   { keys: ['Ctrl', "'"], description: 'Toggle Snap to Grid', category: 'Canvas' },
   { keys: ['Hold Ctrl'], description: 'Temporarily disable snapping (grid & guides)', category: 'Canvas' },
+  
+  // Collaboration
+  { keys: ['Ctrl', '/'], description: 'Toggle comments panel', category: 'Collaboration' },
   
   // General
   { keys: ['?'], description: 'Show keyboard shortcuts', category: 'General' },
@@ -109,13 +112,14 @@ const ShortcutsPanel: React.FC<ShortcutsPanelProps> = ({ isOpen, onClose }) => {
     return acc;
   }, {} as Record<string, Shortcut[]>);
 
-  const categories: Array<'Tools' | 'Selection' | 'Editing' | 'Alignment' | 'Transform' | 'Canvas' | 'General'> = [
+  const categories: Array<'Tools' | 'Selection' | 'Editing' | 'Alignment' | 'Transform' | 'Canvas' | 'Collaboration' | 'General'> = [
     'Tools',
     'Selection',
     'Editing',
     'Alignment',
     'Transform',
     'Canvas',
+    'Collaboration',
     'General',
   ];
 

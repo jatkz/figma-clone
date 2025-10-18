@@ -27,6 +27,7 @@ A **high-performance** real-time collaborative canvas application built with Rea
 - **Smart Guides** - Alignment guides with automatic snapping
 - **Snap-to-Grid** - Toggle-able grid snapping (10px grid)
 - **Zoom & Pan** - Navigate large canvases with mouse wheel zoom and space+drag panning
+- **Collaborative Comments** - Add comments to objects, resolve discussions, and @mention team members
 
 ### Text Formatting
 - **Font Customization** - Choose from multiple font families
@@ -55,6 +56,7 @@ A **high-performance** real-time collaborative canvas application built with Rea
 - **Transform** - [ / ] (rotate), Ctrl+Shift+R (reset rotation)
 - **Canvas** - Ctrl+0 (reset zoom), Ctrl++/- (zoom), Space+Drag (pan)
 - **Snapping** - Ctrl+' (toggle grid), Hold Ctrl (disable snapping)
+- **Collaboration** - Ctrl+/ (toggle comments)
 - **Help** - ? (show all shortcuts)
 
 ---
@@ -198,6 +200,9 @@ figma-clone/
 │   │   ├── ToolPanel.tsx              # Tool selection panel
 │   │   ├── AlignmentToolbar.tsx       # Alignment/distribution tools
 │   │   ├── SelectionFilterPanel.tsx   # Advanced selection filters
+│   │   ├── CommentPanel.tsx           # Comments sidebar (NEW)
+│   │   ├── CommentThread.tsx          # Individual comment display (NEW)
+│   │   ├── CommentInput.tsx           # Comment input form (NEW)
 │   │   ├── AIChat.tsx                 # AI assistant interface
 │   │   ├── ExportDialog.tsx           # Export options dialog
 │   │   └── ...
@@ -214,6 +219,7 @@ figma-clone/
 │   │   ├── useCanvasAlignment.ts      # Align/distribute (NEW)
 │   │   ├── useCanvasObjectCreation.ts # Object creation (NEW)
 │   │   ├── useCanvasViewport.ts       # Zoom/pan (NEW)
+│   │   ├── useComments.ts             # Comment management (NEW)
 │   │   ├── useAuth.ts                 # Authentication
 │   │   ├── useResize.ts               # Object resizing
 │   │   └── useRotation.ts             # Object rotation
@@ -230,6 +236,7 @@ figma-clone/
 │   │   │       ├── aiShapeArrange.ts
 │   │   │       └── aiShapeGrid.ts
 │   │   ├── canvasService.ts           # Firebase canvas operations
+│   │   ├── commentService.ts          # Comment operations (NEW)
 │   │   ├── aiCanvasService.ts         # AI Canvas dispatcher
 │   │   ├── aiService.ts               # OpenAI integration
 │   │   └── userService.ts             # User management
@@ -248,6 +255,7 @@ figma-clone/
 │   │
 │   ├── types/                         # TypeScript types
 │   │   ├── canvas.ts                  # Canvas object types
+│   │   ├── comments.ts                # Comment types (NEW)
 │   │   ├── snap.ts                    # Snapping types
 │   │   ├── filters.ts                 # Filter criteria (NEW)
 │   │   └── aiTools.ts                 # AI tool definitions

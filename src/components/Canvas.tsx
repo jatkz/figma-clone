@@ -36,6 +36,7 @@ import { getCanvasCursor } from '../utils/canvasHelpers';
 import CanvasObjects from './canvas/CanvasObjects';
 import SelectionOverlay from './canvas/SelectionOverlay';
 import CanvasControls from './canvas/CanvasControls';
+import CommentPanel from './CommentPanel';
 
 // Throttle utility for cursor updates
 const throttle = <T extends (...args: any[]) => void>(func: T, delay: number): T => {
@@ -88,6 +89,7 @@ export interface CanvasRef {
   resetZoom: () => void;
   exportCanvas: (options: ExportOptions) => Promise<void>;
   generatePreview: (mode: 'viewport' | 'entire' | 'selected') => string | null;
+  toggleComments: () => void;
 }
 
 const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChange, magicWandTolerance = 15, filterPreviewIds = [] }, ref) => {
@@ -176,6 +178,9 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
   
   // Text editing state (track which text object is being edited)
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
+  
+  // Comments panel state
+  const [showCommentsPanel, setShowCommentsPanel] = useState(false);
   
   // Throttled cursor update function (configurable via environment variable)
   const cursorThrottle = parseInt(import.meta.env.VITE_CURSOR_SYNC_THROTTLE) || 250;
@@ -580,6 +585,9 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
       };
       
       return generatePreview(params, mode);
+    },
+    toggleComments: () => {
+      setShowCommentsPanel(prev => !prev);
     }
   }), [handleDuplicateObject, handleDeleteSelected, handleClearSelection, handleSelectAll, handleSelectNext, handleSelectPrevious, handleSelectInverse, handleSelectByType, handleSelectByIds, handleAlign, handleDistribute, handleAlignToCanvas, rotateBy, resetRotation, setZoom, zoomIn, zoomOut, resetZoom, selectedObjectIds, editingTextId, toastFunction, viewport, objects, stageRef]);
 
@@ -769,6 +777,11 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
     );
   }
 
+  // Get selected object for comments panel
+  const selectedObject = selectedObjectIds.length === 1 
+    ? objects.find(obj => obj.id === selectedObjectIds[0]) || null
+    : null;
+
   return (
     <div className="w-full h-full bg-gray-100 overflow-hidden relative">
       {/* Text Formatting Toolbar - shows when single text object is selected and NOT editing */}
@@ -802,6 +815,17 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
         }
         return null;
       })()}
+
+      {/* Comments Panel - shows when toggled */}
+      {showCommentsPanel && (
+        <CommentPanel
+          selectedObject={selectedObject}
+          currentUserId={user?.id}
+          currentUserName={user?.displayName}
+          currentUserColor={user?.cursorColor}
+          onClose={() => setShowCommentsPanel(false)}
+        />
+      )}
 
       <Stage
         ref={stageRef}

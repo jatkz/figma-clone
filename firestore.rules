@@ -19,6 +19,11 @@ service cloud.firestore {
       allow read, write: if true;
     }
     
+    // Comments subcollection under canvas/global
+    match /canvas/global/comments/{commentId} {
+      allow read, write: if true;
+    }
+    
     // Users collection - temporarily open for MVP
     match /users/{userId} {
       allow read, write: if true;

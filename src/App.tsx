@@ -234,6 +234,13 @@ function AppContent() {
         return;
       }
 
+      // Toggle Comments: Ctrl/Cmd+/
+      if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+        e.preventDefault();
+        canvasRef.current?.toggleComments();
+        return;
+      }
+
       // Reset rotation: Ctrl/Cmd+Shift+R (only for single selection)
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'r' || e.key === 'R')) {
         e.preventDefault();
@@ -376,6 +383,15 @@ function AppContent() {
                   }`}
                 >
                   🤖 AI Chat
+                </button>
+
+                {/* Comments Toggle */}
+                <button
+                  onClick={() => canvasRef.current?.toggleComments()}
+                  className="px-3 py-1 text-sm rounded-lg font-medium transition-colors flex-shrink-0 bg-gray-200 hover:bg-gray-300 text-gray-700"
+                  title="Toggle comments panel (Ctrl+/)"
+                >
+                  💬 Comments
                 </button>
 
                 {/* Select Menu */}
