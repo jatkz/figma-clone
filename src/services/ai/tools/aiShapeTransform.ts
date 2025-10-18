@@ -137,7 +137,7 @@ export const aiResizeShape = async (
         width,
         height,
         modifiedBy: userId
-      };
+      } as any;
     } else if (shape.type === 'circle') {
       const radius = Math.max(25, Math.min(500, Math.max(params.width, params.height) / 2));
       
@@ -149,7 +149,7 @@ export const aiResizeShape = async (
         y: validCoords.y,
         radius,
         modifiedBy: userId
-      };
+      } as any;
     } else if (shape.type === 'text') {
       // For text, width and height affect the text box size
       const width = Math.max(50, Math.min(1000, params.width));
@@ -164,7 +164,7 @@ export const aiResizeShape = async (
         width,
         height,
         modifiedBy: userId
-      };
+      } as any;
     }
     
     await updateObject(shape.id, updates);

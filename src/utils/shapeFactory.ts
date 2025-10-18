@@ -61,7 +61,7 @@ export const createNewText = (
   userId: string, 
   text = 'Sample Text',
   fontSize = 16
-): TextObject => {
+): Omit<TextObject, 'id'> => {
   const textWidth = text.length * fontSize * 0.6;
   const textHeight = fontSize * 1.2;
   const color = getRandomColor();

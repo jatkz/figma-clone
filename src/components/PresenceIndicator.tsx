@@ -27,7 +27,7 @@ const PresenceIndicator: React.FC<PresenceIndicatorProps> = () => {
 
     const cleanup = async () => {
       try {
-        await cleanupStaleCursors(user.id);
+        await cleanupStaleCursors();
       } catch (error) {
         console.warn('Failed to cleanup stale cursors:', error);
       }

@@ -88,7 +88,7 @@ export function useCanvasObjectCreation({
     const newText = createNewText(x, y, user.id);
 
     // Create with optimistic updates and Firestore sync
-    await createObjectOptimistic(newText);
+    await createObjectOptimistic(newText as any);
     
     // Note: Don't auto-select during creation (user is in creation mode)
   }, [user?.id, screenToCanvasCoords, createObjectOptimistic]);
