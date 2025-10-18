@@ -1,18 +1,46 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '../config/firebase';
 import { 
   initializeCanvas,
   subscribeToObjects,
+  generateObjectId,
   createObject,
   updateObject,
   batchUpdateObjects,
   deleteObject,
   deleteAllObjects,
-  acquireLock,
-  releaseLock,
-  releaseExpiredLocks
-} from '../services/canvasService';
+  acquireObjectLock as acquireLock,
+  releaseObjectLock as releaseLock,
+  releaseExpiredLocks,
+} from '../services/canvasRTDBService';
 import type { CanvasObject } from '../types/canvas';
-import type { CanvasObjectInput, CanvasObjectUpdate } from '../services/canvasService';
+
+// Type definitions for canvas operations
+type CanvasObjectInput = Omit<CanvasObject, 'id'>;
+
+type CanvasObjectUpdate = Partial<{
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  radius: number;
+  text: string;
+  fontSize: number;
+  fontFamily: string;
+  fontWeight: 'normal' | 'bold';
+  fontStyle: 'normal' | 'italic';
+  textAlign: 'left' | 'center' | 'right';
+  textDecoration: string;
+  textColor: string;
+  backgroundColor: string;
+  color: string;
+  rotation: number;
+  modifiedBy: string;
+  lockedBy: string | null;
+  lockedAt: number | null;
+  version: number;
+}>;
 
 // Types for the hook
 interface UseCanvasState {
@@ -81,8 +109,8 @@ const throttle = <T extends (...args: any[]) => void>(func: T, delay: number): T
 };
 
 /**
- * Custom hook for managing canvas state with real-time Firestore synchronization
- * Handles optimistic updates, error recovery, throttled Firestore operations, and object locking
+ * Custom hook for managing canvas state with real-time RTDB synchronization
+ * Handles optimistic updates, error recovery, throttled RTDB operations, and object locking
  */
 export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast): UseCanvasReturn => {
   // State management
@@ -100,12 +128,31 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
 
   // Initialize canvas and set up real-time subscription
   useEffect(() => {
+    // Don't initialize if user is not authenticated
+    if (!userId) {
+      console.log('Waiting for authentication before initializing canvas...');
+      return;
+    }
+
     let mounted = true;
+    let authUnsubscribe: (() => void) | null = null;
 
     const setupCanvas = async () => {
       try {
         setIsLoading(true);
         setError(null);
+
+        // Wait for Firebase Auth to be ready
+        await new Promise<void>((resolve) => {
+          authUnsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+            if (firebaseUser) {
+              console.log('Firebase Auth ready, initializing canvas...');
+              resolve();
+            }
+          });
+        });
+
+        if (!mounted) return;
 
         // Initialize canvas document if needed
         await initializeCanvas();
@@ -116,36 +163,12 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
         const unsubscribe = subscribeToObjects((newObjects) => {
           if (!mounted) return;
 
-          // Merge Firestore objects with any local temporary objects
-          setObjects(prev => {
-            // Keep any temporary objects that aren't represented in Firestore yet
-            const tempObjects = prev.filter(obj => {
-              const isTemp = obj.id.startsWith('temp_');
-              if (!isTemp) return false;
-              
-              // Only keep temp objects that don't have a Firestore counterpart
-              // Use more lenient matching to account for floating point precision
-              const hasFirestoreVersion = newObjects.some(fsObj => 
-                Math.abs(fsObj.x - obj.x) < 1 && 
-                Math.abs(fsObj.y - obj.y) < 1 && 
-                fsObj.type === obj.type &&
-                fsObj.createdBy === obj.createdBy
-              );
-              
-              return !hasFirestoreVersion;
-            });
-            
-            // Create a Map to ensure no duplicate IDs from Firestore
-            const firestoreMap = new Map();
-            newObjects.forEach(obj => firestoreMap.set(obj.id, obj));
-            
-            // Combine temp objects with unique Firestore objects
-            const merged = [...tempObjects, ...Array.from(firestoreMap.values())];
-            
-            return merged;
-          });
+          // Always trust RTDB data - it's the source of truth
+          // Optimistic updates in acquireObjectLock/releaseObjectLock are temporary
+          // and will be confirmed/overridden by RTDB in milliseconds
+          setObjects(newObjects);
           
-          lastKnownGoodStateRef.current = [...newObjects]; // Deep copy for rollback (Firestore objects only)
+          lastKnownGoodStateRef.current = [...newObjects]; // Deep copy for rollback
           setIsConnected(true);
           setError(null);
         });
@@ -171,12 +194,15 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
     // Cleanup function
     return () => {
       mounted = false;
+      if (authUnsubscribe) {
+        authUnsubscribe();
+      }
       if (unsubscribeRef.current) {
         unsubscribeRef.current();
         unsubscribeRef.current = null;
       }
     };
-  }, []);
+  }, [userId]); // Re-initialize when authentication status changes
 
   // Lock timeout checker - runs every 5 seconds
   useEffect(() => {
@@ -272,40 +298,43 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
   const createObjectOptimistic = useCallback(async (
     objectData: CanvasObjectInput
   ): Promise<CanvasObject | null> => {
-    // Use the existing temp ID from the object data (shapes come with pre-generated IDs)
-    const tempId = (objectData as any).id;
-    if (!tempId) {
-      throw new Error('Object data must have a temporary ID');
-    }
+    // Pre-generate the RTDB key so object has its final ID immediately
+    const objectId = generateObjectId();
     
-        try {
-          const optimisticObject: any = {
-            ...objectData,
-            id: tempId
-          };
+    try {
+      const optimisticObject: any = {
+        ...objectData,
+        id: objectId
+      };
 
-          // 1. Create locally (optimistic)
-          setObjects(prev => [...prev, optimisticObject]);
+      // 1. Create locally (optimistic) with final ID
+      setObjects(prev => {
+        // Check for duplicates before adding (safety check)
+        if (prev.some(obj => obj.id === objectId)) {
+          console.warn('[createObjectOptimistic] Object already exists:', objectId);
+          return prev;
+        }
+        return [...prev, optimisticObject];
+      });
 
-          // 2. Send to Firestore
-          const createdObject = await createObject(objectData);
+      // 2. Send to RTDB with the same ID
+      await createObject(objectId, objectData);
 
-          // 3. Real-time listener will automatically handle the temp-to-real replacement
-          // based on the matching position and properties
-          return createdObject;
+      // 3. Real-time listener will update with any server-side changes
+      return optimisticObject;
 
-        } catch (error) {
-          console.error('Object creation failed:', error);
+    } catch (error) {
+      console.error('Object creation failed:', error);
       
-      // Rollback: remove the specific optimistic object that failed
-      setObjects(prev => prev.filter(obj => obj.id !== tempId));
+      // Rollback: remove the optimistic object that failed
+      setObjects(prev => prev.filter(obj => obj.id !== objectId));
       toast('Failed to create object', 'error');
       
       return null;
     }
-  }, []);
+  }, [toast]);
 
-  // Local-only object update (no Firestore sync)
+  // Local-only object update (no RTDB sync)
   // Used during multi-select drag to avoid creating individual throttled updates
   const updateObjectLocal = useCallback((
     objectId: string, 
@@ -316,12 +345,12 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
       return null;
     }
 
-    // Update locally immediately (no Firestore sync)
-    const updatedObject: CanvasObject = {
+    // Update locally immediately (no RTDB sync)
+    const updatedObject = {
       ...currentObject,
       ...updates,
       version: currentObject.version + 1
-    };
+    } as CanvasObject;
 
     setObjects(prev => 
       prev.map(obj => 
@@ -332,7 +361,7 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
     return updatedObject;
   }, [objects]);
 
-  // Optimistic object update (with Firestore sync)
+  // Optimistic object update (with RTDB sync)
   const updateObjectOptimistic = useCallback(async (
     objectId: string, 
     updates: CanvasObjectUpdate
@@ -384,7 +413,7 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
             ...currentObject,
             ...update,
             version: currentObject.version + 1
-          });
+          } as CanvasObject);
         }
       });
 
@@ -397,7 +426,9 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
       await flushPendingUpdates(objectIds);
 
       // 3. Send batch update to Firestore (after all throttled updates are done)
-      await batchUpdateObjects(updates);
+      // Convert Map to Array format for RTDB batch update
+      const updateArray = Array.from(updates.entries()).map(([id, data]) => ({ id, data }));
+      await batchUpdateObjects(updateArray);
       
       return true;
 
@@ -480,16 +511,36 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
       return false;
     }
 
-    // Check if this is a temporary ID - if so, the object hasn't been created in Firestore yet
-    if (objectId.startsWith('temp_')) {
-      console.log(`⚠️  Cannot acquire lock on temporary object ${objectId} - object not yet in Firestore`);
-      toast('Please wait for object creation to complete', 'warning', 1500);
-      return false;
-    }
+    // No need to check for temp IDs anymore - objects have their final RTDB ID immediately
 
     try {
+      // Preserve original lock state before optimistic update
+      const originalObject = objects.find(obj => obj.id === objectId);
+      const originalLockBy = originalObject?.lockedBy || null;
+      const originalLockAt = originalObject?.lockedAt || null;
+      
+      // Optimistically update local state BEFORE waiting for RTDB
+      // This prevents race condition where user drags before RTDB update arrives
+      setObjects(prev => 
+        prev.map(obj => 
+          obj.id === objectId 
+            ? { ...obj, lockedBy: userId, lockedAt: Date.now() } 
+            : obj
+        )
+      );
+
       const success = await acquireLock(objectId, userId);
+      
       if (!success) {
+        // Rollback to ORIGINAL lock state (don't clear other user's lock!)
+        setObjects(prev => 
+          prev.map(obj => 
+            obj.id === objectId 
+              ? { ...obj, lockedBy: originalLockBy, lockedAt: originalLockAt } 
+              : obj
+          )
+        );
+
         // Find the object to get the locking user info
         const object = objects.find(obj => obj.id === objectId);
         if (object?.lockedBy && lockingUserName) {
@@ -500,6 +551,18 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
       }
       return success;
     } catch (error) {
+      // Rollback to ORIGINAL lock state on error
+      const originalObject = objects.find(obj => obj.id === objectId);
+      const originalLockBy = originalObject?.lockedBy || null;
+      const originalLockAt = originalObject?.lockedAt || null;
+      
+      setObjects(prev => 
+        prev.map(obj => 
+          obj.id === objectId 
+            ? { ...obj, lockedBy: originalLockBy, lockedAt: originalLockAt } 
+            : obj
+        )
+      );
       toast('Failed to lock object', 'error');
       return false;
     }
@@ -512,9 +575,19 @@ export const useCanvas = (userId?: string, toast: ToastFunction = defaultToast):
     }
 
     try {
-      const success = await releaseLock(objectId, userId);
-      return success;
+      // Optimistically update local state BEFORE waiting for RTDB
+      setObjects(prev => 
+        prev.map(obj => 
+          obj.id === objectId 
+            ? { ...obj, lockedBy: null, lockedAt: null } 
+            : obj
+        )
+      );
+
+      await releaseLock(objectId);
+      return true;
     } catch (error) {
+      // RTDB will send the correct state back via real-time listener
       return false;
     }
   }, [userId]);

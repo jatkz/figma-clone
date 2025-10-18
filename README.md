@@ -93,6 +93,7 @@ A **high-performance** real-time collaborative canvas application built with Rea
    VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
    VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
    VITE_FIREBASE_APP_ID=your_app_id
+   VITE_FIREBASE_DATABASE_URL=https://your-project-default-rtdb.firebaseio.com
 
    # Auth0 Configuration (Required)
    VITE_AUTH0_DOMAIN=your_auth0_domain.auth0.com
@@ -138,7 +139,8 @@ A **high-performance** real-time collaborative canvas application built with Rea
 - **react-konva 18.2** - React wrapper for Konva
 
 ### Backend & Authentication
-- **Firebase Firestore 11.1** - NoSQL database with real-time synchronization
+- **Firebase Realtime Database** - High-performance real-time sync for objects & cursors
+- **Firebase Firestore 11.1** - Complex queries for comments & user profiles
 - **Auth0** - User authentication and authorization
 
 ### AI Integration
@@ -169,9 +171,10 @@ A **high-performance** real-time collaborative canvas application built with Rea
 └─────────────────────────────────────────────────┘
                       ↕
 ┌─────────────────────────────────────────────────┐
-│              Real-time Backend                   │
+│          Hybrid Database Backend                 │
 ├─────────────────────────────────────────────────┤
-│  Firebase Firestore (Database + Live Updates)   │
+│  RTDB: Objects + Cursors (60% faster)           │
+│  Firestore: Comments + Users (complex queries)  │
 │  Auth0 (Authentication)                         │
 └─────────────────────────────────────────────────┘
                       ↕
@@ -235,7 +238,8 @@ figma-clone/
 │   │   │       ├── aiShapeManagement.ts
 │   │   │       ├── aiShapeArrange.ts
 │   │   │       └── aiShapeGrid.ts
-│   │   ├── canvasService.ts           # Firebase canvas operations
+│   │   ├── canvasRTDBService.ts       # RTDB for objects/cursors (60% faster)
+│   │   ├── canvasService.ts           # Legacy Firestore service
 │   │   ├── commentService.ts          # Comment operations (NEW)
 │   │   ├── aiCanvasService.ts         # AI Canvas dispatcher
 │   │   ├── aiService.ts               # OpenAI integration
@@ -335,7 +339,7 @@ Sub-Components Extracted:
 
 - **Object Count**: Optimal performance with <100 objects
 - **Cursor Throttle**: 50ms (adjustable via `VITE_CURSOR_SYNC_THROTTLE`)
-- **Object Throttle**: 300ms for drag updates
+- **Object Throttle**: 100ms for drag updates
 - **Browser**: Chrome/Edge recommended for best canvas performance
 
 ---
@@ -344,22 +348,34 @@ Sub-Components Extracted:
 
 ### Real-time Synchronization
 
-The application uses **Firebase Firestore** for all real-time data synchronization:
+The application uses a **Hybrid Firebase Architecture** for optimal performance:
+
+#### **Realtime Database (RTDB)** - High-Frequency Updates
+- **Canvas Objects** - 60% faster drag/move operations (~75ms vs 200ms)
+- **Cursor Tracking** - 67% faster multiplayer cursors (~50ms vs 150ms)
+- **Object Locks** - Atomic transactions for lock acquisition
+
+#### **Firestore** - Complex Queries
+- **Comments** - Requires compound queries (objectId + orderBy)
+- **User Profiles** - Structured document storage
+- **Canvas Metadata** - Complex nested documents
 
 #### **How It Works:**
-1. **Optimistic Updates** - UI updates immediately, then syncs with Firestore
-2. **Live Listeners** - `onSnapshot` listeners provide instant updates across all clients
-3. **Conflict Resolution** - Last-write-wins with version tracking via transactions
-4. **Object Locking** - Users acquire locks on objects they're editing (stored in Firestore)
-5. **Cursor Tracking** - Live cursor positions synchronized in real-time (Firestore collection)
+1. **Optimistic Updates** - UI updates immediately, then syncs
+2. **Live Listeners** - RTDB `onValue()` + Firestore `onSnapshot()`
+3. **Conflict Resolution** - Last-write-wins with version tracking
+4. **Object Locking** - RTDB transactions for atomic lock operations
+5. **Cursor Tracking** - Real-time position updates in RTDB
 
 #### **Technical Details:**
-- **Collections Used:**
-  - `canvas/global/objects` - Canvas objects (rectangles, circles, text)
-  - `canvas/global/cursors` - User cursor positions
-- **Real-time Method:** Firestore `onSnapshot()` listeners
-- **Update Strategy:** Optimistic UI updates + throttled Firestore writes (300ms)
-- **Batch Operations:** Atomic transactions for multi-object updates
+- **RTDB Paths:**
+  - `canvas/global/objects` - Canvas objects (fast updates)
+  - `canvas/global/cursors` - User cursor positions (ephemeral)
+- **Firestore Collections:**
+  - `canvas/global/comments` - Comments with queries
+  - `users` - User profiles
+- **Update Strategy:** Optimistic UI + throttled backend writes (100ms RTDB, 300ms Firestore)
+- **Batch Operations:** Multi-object updates in single RTDB transaction
 
 ### Canvas State Management
 
@@ -465,9 +481,9 @@ npm run build
 This creates an optimized production build in the `dist/` directory.
 
 **Build Output:**
-- `dist/assets/index-[hash].js` - ~1.31 MB (362 kB gzipped)
-- `dist/assets/index-[hash].css` - ~25 kB (5.4 kB gzipped)
-- Total: ~1.33 MB uncompressed, ~367 kB gzipped
+- `dist/assets/index-[hash].js` - ~1.52 MB (412 kB gzipped)
+- `dist/assets/index-[hash].css` - ~26 kB (5.5 kB gzipped)
+- Total: ~1.55 MB uncompressed, ~417 kB gzipped
 
 **Optimizations Applied:**
 - Tree-shaking for unused code

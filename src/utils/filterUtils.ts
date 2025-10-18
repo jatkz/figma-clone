@@ -25,6 +25,7 @@ export function applyFilters(
     
     // Color filter
     if (criteria.colors && criteria.colors.length > 0) {
+      if (!obj.color) return false; // Skip objects without color
       const objColor = obj.color.toUpperCase();
       const matchesColor = criteria.colors.some(
         color => color.toUpperCase() === objColor
@@ -128,7 +129,11 @@ export function getMatchingCount(
  */
 export function getUniqueColorsFromObjects(objects: CanvasObject[]): string[] {
   const colorSet = new Set<string>();
-  objects.forEach(obj => colorSet.add(obj.color.toUpperCase()));
+  objects.forEach(obj => {
+    if (obj.color) {
+      colorSet.add(obj.color.toUpperCase());
+    }
+  });
   return Array.from(colorSet).sort();
 }
 

@@ -3,7 +3,10 @@
  * Handles creating new shapes (rectangles, circles, text) on the canvas
  */
 
-import { createObject, type CanvasObjectInput } from '../../canvasService';
+import { generateObjectId, createObject } from '../../canvasRTDBService';
+import type { CanvasObject } from '../../../types/canvas';
+
+type CanvasObjectInput = Omit<CanvasObject, 'id'>;
 import type { RectangleObject, CircleObject, TextObject } from '../../../types/canvas';
 import type { CreateShapeParams, AIOperationResult } from '../../../types/aiTools';
 import { resolveCoordinates, validateCoordinates, parseColor } from '../../../types/aiTools';
@@ -113,12 +116,14 @@ export const aiCreateShape = async (
         };
     }
     
-    const createdObject = await createObject(objectData);
+    // Create object in RTDB with pre-generated ID
+    const objectId = generateObjectId();
+    await createObject(objectId, objectData);
     
     return {
       success: true,
       message: `Created ${params.type} at position (${validCoords.x}, ${validCoords.y})`,
-      objectIds: [createdObject.id]
+      objectIds: [objectId]
     };
     
   } catch (error: any) {

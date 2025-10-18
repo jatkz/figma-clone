@@ -3,7 +3,7 @@ import { Line, Rect } from 'react-konva';
 import SnapGuides from '../SnapGuides';
 import Cursor from '../Cursor';
 import type { SnapGuide } from '../../types/snap';
-import type { CursorData } from '../../services/canvasService';
+import type { CursorData } from '../../services/canvasRTDBService';
 
 interface CanvasControlsProps {
   snapGuides: SnapGuide[];

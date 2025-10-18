@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { Text as KonvaText, Group, Rect } from 'react-konva';
-import type { TextObject, User } from '../types/canvas';
+import type { TextObject } from '../types/canvas';
 
 interface TextObjectProps {
   textObject: TextObject;
@@ -14,7 +14,7 @@ interface TextObjectProps {
   onDragEnd: (id: string, x: number, y: number) => Promise<void> | void;
   onStartEdit: (id: string) => boolean;
   currentUserId?: string;
-  users: Map<string, User>;
+  users?: Map<string, { displayName: string; cursorColor: string }>;
 }
 
 const TextObjectComponent: React.FC<TextObjectProps> = ({
@@ -34,7 +34,7 @@ const TextObjectComponent: React.FC<TextObjectProps> = ({
   // Lock status logic
   const isLockedByCurrentUser = textObject.lockedBy === currentUserId;
   const isLockedByOther = textObject.lockedBy && textObject.lockedBy !== currentUserId;
-  const lockingUser = textObject.lockedBy ? users.get(textObject.lockedBy) : null;
+  const lockingUser = textObject.lockedBy ? users?.get(textObject.lockedBy) : null;
 
   // Calculate text dimensions
   const textWidth = textObject.width || textObject.text.length * textObject.fontSize * 0.6;
@@ -253,4 +253,5 @@ const TextObjectComponent: React.FC<TextObjectProps> = ({
   );
 };
 
+// Use React.memo with default shallow comparison
 export default React.memo(TextObjectComponent);

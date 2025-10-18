@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import type { CanvasObject, User } from '../types/canvas';
-import type { CanvasObjectUpdate } from '../services/canvasService';
+
+type CanvasObjectUpdate = Partial<Omit<CanvasObject, 'id'>>;
 import { alignObjects, distributeObjects, alignToCanvas, type AlignmentType, type DistributionType } from '../utils/alignmentUtils';
 
 interface UseCanvasAlignmentParams {

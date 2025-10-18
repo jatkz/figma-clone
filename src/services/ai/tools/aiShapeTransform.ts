@@ -3,7 +3,10 @@
  * Handles moving, resizing, and rotating shapes
  */
 
-import { updateObject, type CanvasObjectUpdate } from '../../canvasService';
+import { updateObject } from '../../canvasRTDBService';
+import type { CanvasObject } from '../../../types/canvas';
+
+type CanvasObjectUpdate = Partial<Omit<CanvasObject, 'id'>>;
 import type { MoveShapeParams, ResizeShapeParams, RotateShapeParams, AIOperationResult } from '../../../types/aiTools';
 import { resolveCoordinates, validateCoordinates } from '../../../types/aiTools';
 import { getShapeDimensions } from '../../../utils/shapeUtils';

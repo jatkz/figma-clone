@@ -181,9 +181,7 @@ export function useCanvasSelection({
         return;
       }
       
-      // Clear previous selections and select this one
-      await releaseMultipleLocks(selectedObjectIds);
-      
+      // Try to acquire lock on the new object first
       const targetObject = objects.find(obj => obj.id === objectId);
       let lockingUserName = 'Unknown User';
       
@@ -192,12 +190,15 @@ export function useCanvasSelection({
       }
       
       const lockAcquired = await acquireObjectLock(objectId, lockingUserName);
+      
       if (lockAcquired) {
+        // Only clear previous selection after new lock is acquired
+        await releaseMultipleLocks(selectedObjectIds);
         setSelectedObjectIds([objectId]);
         toastFunction('Object selected for editing', 'success', 1500);
       } else {
-        // Lock not acquired, clear selection
-        setSelectedObjectIds([]);
+        // Lock not acquired, keep current selection and show error
+        toastFunction(`Object is locked by ${lockingUserName}`, 'error', 2000);
       }
     }
   }, [activeTool, selectedObjectIds, acquireObjectLock, releaseObjectLock, releaseMultipleLocks, objects, user?.id, toastFunction, handleMagicWandClick]);

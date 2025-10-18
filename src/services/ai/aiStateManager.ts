@@ -3,7 +3,7 @@
  * Handles canvas state tracking for AI operations
  */
 
-import { subscribeToObjects } from '../canvasService';
+import { subscribeToObjects } from '../canvasRTDBService';
 import type { CanvasObject } from '../../types/canvas';
 
 // Current canvas state
@@ -29,7 +29,6 @@ export const initializeAICanvasState = () => {
   
   canvasSubscription = subscribeToObjects((objects) => {
     currentCanvasObjects = objects;
-    console.log(`🤖 AI Canvas State Updated: ${objects.length} objects`);
   });
 };
 

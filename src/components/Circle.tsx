@@ -1,6 +1,6 @@
 import React from 'react';
 import { Circle as KonvaCircle, Group, Text } from 'react-konva';
-import type { CircleObject, User } from '../types/canvas';
+import type { CircleObject } from '../types/canvas';
 
 interface CircleProps {
   circle: CircleObject;
@@ -12,7 +12,7 @@ interface CircleProps {
   onDragMove: (id: string, x: number, y: number) => void;
   onDragEnd: (id: string, x: number, y: number) => Promise<void> | void;
   currentUserId?: string;
-  users: Map<string, User>;
+  users?: Map<string, { displayName: string; cursorColor: string }>;
 }
 
 const Circle: React.FC<CircleProps> = ({
@@ -30,7 +30,7 @@ const Circle: React.FC<CircleProps> = ({
   // Lock status logic
   const isLockedByCurrentUser = circle.lockedBy === currentUserId;
   const isLockedByOther = circle.lockedBy && circle.lockedBy !== currentUserId;
-  const lockingUser = circle.lockedBy ? users.get(circle.lockedBy) : null;
+  const lockingUser = circle.lockedBy ? users?.get(circle.lockedBy) : null;
 
   const handleClick = (e: any) => {
     e.cancelBubble = true;
@@ -193,4 +193,5 @@ const Circle: React.FC<CircleProps> = ({
   );
 };
 
+// Use React.memo with default shallow comparison
 export default React.memo(Circle);

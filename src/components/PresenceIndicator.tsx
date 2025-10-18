@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { subscribeToCursors, cleanupStaleCursors, type CursorData } from '../services/canvasService';
+import { subscribeToCursors, cleanupStaleCursors, type CursorData } from '../services/canvasRTDBService';
 import { useAuth } from '../hooks/useAuth';
 
 interface PresenceIndicatorProps {}

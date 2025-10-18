@@ -1,0 +1,23 @@
+{
+  "rules": {
+    "canvas": {
+      "global": {
+        // Objects - authenticated users can read/write
+        "objects": {
+          ".read": "auth != null",
+          "$objectId": {
+            ".write": "auth != null"
+          }
+        },
+        
+        // Cursors - authenticated users can read and write any cursor
+        // (Cursors are temporary position data, not sensitive)
+        "cursors": {
+          ".read": "auth != null",
+          ".write": "auth != null"
+        }
+      }
+    }
+  }
+}
+

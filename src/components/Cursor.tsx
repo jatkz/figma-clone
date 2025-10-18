@@ -1,6 +1,6 @@
 import React from 'react';
 import { Group, Circle, Text } from 'react-konva';
-import type { CursorData } from '../services/canvasService';
+import type { CursorData } from '../services/canvasRTDBService';
 
 interface CursorProps {
   cursorData: CursorData;

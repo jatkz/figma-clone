@@ -2,7 +2,8 @@ import type { RectangleObject, CircleObject, TextObject } from '../types/canvas'
 import { getRandomColor } from './colors';
 
 /**
- * Generate a temporary ID for new objects (before Firestore assigns real ID)
+ * Generate a temporary ID for new objects (before RTDB assigns real ID)
+ * Note: This is only used for object duplication. New objects get RTDB keys directly.
  */
 export const generateTempId = (): string => {
   return `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -66,7 +67,6 @@ export const createNewText = (
   const color = getRandomColor();
   
   return {
-    id: generateTempId(),
     type: 'text',
     x: Math.max(0, Math.min(5000 - textWidth, x)),
     y: Math.max(0, Math.min(5000 - textHeight, y)),

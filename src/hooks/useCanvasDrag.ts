@@ -1,6 +1,7 @@
 import { useRef, useCallback, useEffect } from 'react';
 import type { CanvasObject } from '../types/canvas';
-import type { CanvasObjectUpdate } from '../services/canvasService';
+
+type CanvasObjectUpdate = Partial<Omit<CanvasObject, 'id'>>;
 import type { SnapGuide, SnapSettings } from '../types/snap';
 import { getShapeDimensions } from '../utils/shapeUtils';
 import { constrainToBounds } from '../utils/constrainToBounds';

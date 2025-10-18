@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { subscribeToCursors, type CursorData } from '../services/canvasService';
+import { subscribeToCursors, type CursorData } from '../services/canvasRTDBService';
 
 interface UserListProps {
   className?: string;

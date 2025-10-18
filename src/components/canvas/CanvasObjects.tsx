@@ -1,5 +1,6 @@
 import React from 'react';
 import type { CanvasObject } from '../../types/canvas';
+import type { CursorData } from '../../services/canvasRTDBService';
 import Rectangle from '../Rectangle';
 import CircleComponent from '../Circle';
 import TextObjectComponent from '../TextObject';
@@ -10,6 +11,7 @@ interface CanvasObjectsProps {
   filterPreviewIds: string[];
   editingTextId: string | null;
   currentUserId?: string;
+  otherCursors: Map<string, CursorData>;
   onRectangleClick: (objectId: string, shiftKey?: boolean) => Promise<void>;
   onDeselect: () => Promise<void>;
   onDragStart: (objectId: string) => boolean;
@@ -28,6 +30,7 @@ const CanvasObjects: React.FC<CanvasObjectsProps> = ({
   filterPreviewIds,
   editingTextId,
   currentUserId,
+  otherCursors,
   onRectangleClick,
   onDeselect,
   onDragStart,
@@ -44,17 +47,29 @@ const CanvasObjects: React.FC<CanvasObjectsProps> = ({
     });
   }, [objects]);
 
-  // Build user map for displaying user info
+  // Build user map for displaying user info (merge current user + other users)
+  // Map CursorData to the format expected by components
   const userMap = React.useMemo(() => {
-    const map = new Map();
+    const map = new Map<string, { displayName: string; cursorColor: string }>();
+    
+    // Add other users from cursor tracking
+    otherCursors.forEach((cursorData, userId) => {
+      map.set(userId, {
+        displayName: cursorData.name || 'Unknown User',
+        cursorColor: cursorData.color || '#FF3B30'
+      });
+    });
+    
+    // Add current user
     if (currentUserId) {
       map.set(currentUserId, {
         displayName: 'You',
         cursorColor: '#007AFF'
       });
     }
+    
     return map;
-  }, [currentUserId]);
+  }, [currentUserId, otherCursors]);
 
   return (
     <>
@@ -107,5 +122,7 @@ const CanvasObjects: React.FC<CanvasObjectsProps> = ({
   );
 };
 
-export default React.memo(CanvasObjects);
+// Not using React.memo here because we need to ensure lock status updates propagate immediately
+// The child components (Rectangle, Circle, TextObject) are memoized with proper comparison functions
+export default CanvasObjects;
 

@@ -25,7 +25,7 @@ import { getShapeDimensions } from '../utils/shapeUtils';
 import { useAuth } from '../hooks/useAuth';
 import { useCanvas } from '../hooks/useCanvas';
 import { useToastContext, createToastFunction } from '../contexts/ToastContext';
-import { updateCursor, subscribeToCursors, type CursorData } from '../services/canvasService';
+import { updateCursor, subscribeToCursors, type CursorData } from '../services/canvasRTDBService';
 import { initializeAICanvasState, cleanupAICanvasState } from '../services/aiCanvasService';
 import { exportToSVG, exportToPNG, generatePreview, type ExportOptions } from '../utils/canvasExport';
 import { useSnap } from '../contexts/SnapContext';
@@ -297,6 +297,10 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
   useEffect(() => {
     if (!user?.id || !isConnected || objects.length === 0 || hasCleanedLocksRef.current) return;
     
+    // Only clean up on initial load - don't interfere with locks acquired during the session
+    // Mark as cleaned immediately to prevent running again
+    hasCleanedLocksRef.current = true;
+    
     // Find any objects that are locked by current user
     const staleLocks = objects.filter(obj => obj.lockedBy === user.id);
     
@@ -309,9 +313,9 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
       });
       
       toastFunction(`Cleared ${staleLocks.length} stale lock(s)`, 'info', 2000);
-      hasCleanedLocksRef.current = true;
     }
-  }, [user?.id, isConnected, objects, releaseObjectLock, toastFunction]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, isConnected]); // Removed objects and functions from deps - only run when connection established
 
   // Cursor position state for multiplayer cursor tracking
   const [, setCursorPosition] = useState<{ x: number; y: number } | null>(null);
@@ -365,6 +369,16 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
       cursorsUnsubscribe();
     };
   }, [user?.id]);
+
+  // Initialize cursor position on mount (so other users can see this user is online)
+  useEffect(() => {
+    if (!user?.id || !user?.displayName || !user?.cursorColor) return;
+
+    // Set initial cursor at canvas center (0, 0 in canvas coords)
+    updateCursor(user.id, 0, 0, user.displayName, user.cursorColor).catch((error) => {
+      console.warn('Failed to initialize cursor:', error);
+    });
+  }, [user?.id, user?.displayName, user?.cursorColor]);
 
   // Initialize AI Canvas state tracking for AI operations
   useEffect(() => {
@@ -865,6 +879,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({ activeTool, onSelectionChan
             filterPreviewIds={filterPreviewIds}
             editingTextId={editingTextId}
             currentUserId={user?.id}
+            otherCursors={otherCursors}
             onRectangleClick={handleRectangleClick}
             onDeselect={async () => {
               if (selectedObjectIds.length > 0) {

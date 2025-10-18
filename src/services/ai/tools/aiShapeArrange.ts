@@ -3,8 +3,10 @@
  * Handles arranging multiple shapes in various layouts
  */
 
-import { updateObject, type CanvasObjectUpdate } from '../../canvasService';
+import { updateObject } from '../../canvasRTDBService';
 import type { CanvasObject } from '../../../types/canvas';
+
+type CanvasObjectUpdate = Partial<Omit<CanvasObject, 'id'>>;
 import type { ArrangeShapesParams, AIOperationResult } from '../../../types/aiTools';
 import { validateCoordinates, CANVAS_BOUNDS } from '../../../types/aiTools';
 import { getShapeDimensions } from '../../../utils/shapeUtils';

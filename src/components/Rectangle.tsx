@@ -66,9 +66,11 @@ const Rectangle: React.FC<RectangleProps> = ({
   };
 
   // Determine lock status and colors
-  const isLockedByCurrentUser = object.lockedBy === currentUserId;
-  const isLockedByOther = object.lockedBy && !isLockedByCurrentUser;
-  const lockingUser = object.lockedBy ? 
+  // CRITICAL: Check if object actually has a lock (not just truthy but specifically non-null)
+  const hasLock = object.lockedBy !== null && object.lockedBy !== undefined && object.lockedBy !== '';
+  const isLockedByCurrentUser = hasLock && object.lockedBy === currentUserId;
+  const isLockedByOther = hasLock && object.lockedBy !== currentUserId;
+  const lockingUser = hasLock && object.lockedBy ? 
     (users instanceof Map ? users.get(object.lockedBy) : users?.[object.lockedBy]) : null;
   
   // Memoize lock border color to avoid recalculation on every render
@@ -145,7 +147,7 @@ const Rectangle: React.FC<RectangleProps> = ({
       )}
 
       {/* Lock indicator border */}
-      {object.lockedBy && (
+      {hasLock && (
         <Rect
           x={object.x - 3}
           y={object.y - 3}
@@ -161,7 +163,7 @@ const Rectangle: React.FC<RectangleProps> = ({
       )}
 
       {/* User label for locked objects */}
-      {object.lockedBy && lockingUser && (
+      {hasLock && lockingUser && (
         <React.Fragment>
           {/* Background for username label */}
           <Rect
@@ -191,4 +193,6 @@ const Rectangle: React.FC<RectangleProps> = ({
   );
 };
 
+// Use React.memo with a simple shallow comparison
+// This provides performance benefits while ensuring lock status updates work
 export default React.memo(Rectangle);

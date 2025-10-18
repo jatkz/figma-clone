@@ -3,7 +3,7 @@
  * Handles deleting shapes and getting canvas state
  */
 
-import { deleteObject } from '../../canvasService';
+import { deleteObject } from '../../canvasRTDBService';
 import type { DeleteShapeParams, AIOperationResult, CanvasStateResult } from '../../../types/aiTools';
 import { findSingleShape } from '../aiQueryUtils';
 import { hexToColorName } from '../aiColorUtils';

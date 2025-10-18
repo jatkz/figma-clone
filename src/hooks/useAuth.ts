@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
+import { signInAnonymously } from 'firebase/auth';
+import { auth } from '../config/firebase';
 import { getOrCreateUserProfile } from '../services/userService';
 import type { User } from '../types/canvas';
 
@@ -34,6 +36,19 @@ export const useAuth = (): UseAuthReturn => {
       setError(null);
 
       try {
+        // Sign in to Firebase Auth anonymously to satisfy RTDB security rules
+        // We use Auth0 for actual user identity, but Firebase RTDB requires Firebase Auth
+        if (!auth.currentUser) {
+          try {
+            await signInAnonymously(auth);
+            console.log('Signed in to Firebase Auth (anonymous)');
+          } catch (authError: any) {
+            // If anonymous auth fails (e.g., not enabled), log but continue
+            // The app will still work with Firestore, just not RTDB
+            console.warn('Firebase anonymous auth failed (enable it in Firebase Console):', authError.code);
+          }
+        }
+
         const userProfile = await getOrCreateUserProfile(
           auth0User.sub,
           auth0User.email,
